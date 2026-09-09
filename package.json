@@ -40,7 +40,7 @@
     "vitest": "^2.0.0"
   },
   "lint-staged": {
-    "*.{ts,tsx,js,jsx,json,css,md}": "biome check --write"
+    "*.{ts,tsx,js,jsx,json,css}": "biome check --write"
   },
   "engines": {
     "node": ">=20.0.0"

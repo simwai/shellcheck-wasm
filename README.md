@@ -1,103 +1,113 @@
 # shellcheck-wasm
 
-[![npm version](https://img.shields.io/npm/v/shellcheck-wasm.svg)](https://www.npmjs.com/package/shellcheck-wasm)
-[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/yourname/shellcheck-wasm)
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL%203.0-blue.svg)](https://opensource.org/licenses/GPL-3.0)
+ShellCheck 0.11 compiled to WebAssembly, with a typed TypeScript API for Node.js and browsers.
 
-**ShellCheck compiled to WebAssembly with a TypeScript API** — Run ShellCheck in the browser, Node.js, or any WASI runtime.
+The module is built with GHC's WebAssembly backend (`wasm32-wasi`) as a WASI reactor exposing two async JSFFI exports, `lint` and `lintWithOptions`. Both runtimes load the same artifact; the only difference is how the WASI imports are provided.
 
-## Features
+## Requirements
 
-- 🚀 **Single WASM artifact** — Works in browser (via WASI polyfill) and Node.js (via wasmtime)
-- 📦 **TypeScript-first API** — Full type definitions included
-- 🔧 **Modern tooling** — Biome (lint/format), Vitest (test), Husky (hooks), lint-staged
-- ⚡ **Fast** — Compiled with GHC 9.6+ WASM backend, optimized with `-O2`
-- 🎯 **Compatible** — Matches ShellCheck v0.11.0 behavior exactly
+- Node.js >= 20
+- The prebuilt `dist/shellcheck.wasm` + `dist/shellcheck.js` (see [Building the WASM module](#building-the-wasm-module)), or build them yourself with the GHC WASM toolchain
 
 ## Installation
 
+The package is not published to npm yet. Use it from source:
+
 ```bash
-npm install shellcheck-wasm
-# or
-yarn add shellcheck-wasm
-# or
-pnpm add shellcheck-wasm
+git clone --recurse-submodules <repo-url> shellcheck-wasm
+cd shellcheck-wasm
+npm install
 ```
 
-## Quick Start
+## Usage
 
 ### Node.js
 
 ```typescript
 import { createShellCheck, lint } from 'shellcheck-wasm';
 
-// One-liner
+// One-shot
 const results = await lint('echo $UNQUOTED_VAR');
 
-// Or create a reusable instance
+// Reusable instance (module is instantiated once and reused)
 const shellcheck = await createShellCheck();
-const results = shellcheck.lint('echo $VAR');
+const results2 = await shellcheck.lint('echo $VAR', { severity: 'warning' });
+```
+
+By default the loader resolves `dist/shellcheck.wasm` relative to the package. Pass an explicit path when needed:
+
+```typescript
+const shellcheck = await createShellCheck({ wasmUrl: '/path/to/shellcheck.wasm' });
 ```
 
 ### Browser
 
-```html
-<script type="module">
-  import { createShellCheck } from 'https://cdn.jsdelivr.net/npm/shellcheck-wasm@latest/dist/index.js';
-  
-  const shellcheck = await createShellCheck({
-    wasmUrl: 'https://cdn.jsdelivr.net/npm/shellcheck-wasm@latest/dist/shellcheck.wasm'
-  });
-  
-  const results = shellcheck.lint(document.getElementById('editor').value);
-  console.log(results);
-</script>
+Serve `dist/shellcheck.wasm` and `dist/shellcheck.js` from the same origin with correct MIME types (`application/wasm` for the `.wasm` file), then:
+
+```typescript
+import { createShellCheck } from 'shellcheck-wasm';
+
+const shellcheck = await createShellCheck({ wasmUrl: '/shellcheck.wasm' });
+const results = await shellcheck.lint(editorValue);
+console.log(results);
 ```
 
-## API
+`wasmUrl` may be any absolute or relative URL. The companion `shellcheck.js` (post-link JSFFI glue) is resolved by replacing the `.wasm` suffix with `.js`.
+
+## API reference
 
 ### `createShellCheck(options?)`
 
-Creates a ShellCheck instance.
+Creates (or returns the cached) ShellCheck instance, instantiating the WASM module on first call.
 
 ```typescript
-interface CreateOptions {
-  /** Path or URL to the WASM file */
-  wasmUrl?: string;
-  /** Force runtime: 'node', 'browser', or 'auto' (default) */
-  runtime?: 'node' | 'browser' | 'auto';
-}
+await createShellCheck(options?: {
+  wasmUrl?: string;              // path or URL of shellcheck.wasm
+  runtime?: 'node' | 'browser' | 'auto';  // default 'auto'
+});
 ```
 
-### `shellcheck.lint(script, options?)`
+### `lint(script, options?)`
 
-Lint a shell script.
+```typescript
+await lint('echo $VAR');                          // LintResult[]
+await lint('echo $VAR', { severity: 'error' });   // filtered
+```
+
+### `lintWithOptions(script, options)`
+
+Same as `lint` with required options object.
+
+### `resetShellCheck()`
+
+Terminates the cached instance. Mainly useful in tests.
+
+### `LintOptions`
 
 ```typescript
 interface LintOptions {
-  /** Shell dialect */
   shell?: 'bash' | 'sh' | 'dash' | 'ksh' | 'busybox';
-  /** Minimum severity */
   severity?: 'error' | 'warning' | 'info' | 'style';
-  /** Warning codes to exclude */
-  exclude?: number[];
-  /** Warning codes to include (only these) */
-  include?: number[];
-  /** Allow sourcing external files */
+  exclude?: number[];      // warning codes to suppress, e.g. [2086]
+  include?: number[];      // if set, only these codes are reported
   externalSources?: boolean;
-  /** Search paths for sourced files */
   sourcePaths?: string[];
-  /** Virtual files for `source` command */
-  files?: Record<string, string>;
+  files?: Record<string, string>;  // virtual files for `source` directives
 }
+```
 
+Severity filtering matches ShellCheck semantics: setting `severity: 'error'` hides `info`-level findings such as SC2086.
+
+### `LintResult`
+
+```typescript
 interface LintResult {
   file: string;
   line: number;
   column: number;
   endLine?: number;
   endColumn?: number;
-  code: number;           // ShellCheck code (e.g., 2086)
+  code: number;   // e.g. 2086
   severity: 'error' | 'warning' | 'info' | 'style';
   message: string;
   fix?: {
@@ -112,119 +122,125 @@ interface LintResult {
 }
 ```
 
-## Development
+Example output for `echo $VAR`:
 
-### Prerequisites
-
-- **Node.js** ≥ 20
-- **GHC WASM toolchain** (for building WASM):
-  ```bash
-  # Via Nix (recommended)
-  nix shell 'gitlab:haskell-wasm/ghc-wasm-meta?host=gitlab.haskell.org'
-  ```
-
-### Setup
-
-```bash
-# Clone with submodules
-git clone --recurse-submodules https://github.com/yourname/shellcheck-wasm
-cd shellcheck-wasm
-
-# Install dependencies
-npm install
-
-# Build WASM (requires GHC WASM toolchain)
-npm run build:wasm
-
-# Build TypeScript
-npm run build
-
-# Run tests
-npm test
+```json
+[
+  {
+    "code": 2148, "severity": "error",
+    "message": "Tips depend on target shell and yours is unknown. Add a shebang or a 'shell' directive."
+  },
+  {
+    "code": 2086, "severity": "info",
+    "message": "Double quote to prevent globbing and word splitting.",
+    "fix": { "replacements": [
+      { "startLine": 1, "startColumn": 6, "endLine": 1, "endColumn": 6, "text": "\"" },
+      { "startLine": 1, "startColumn": 10, "endLine": 1, "endColumn": 10, "text": "\"" }
+    ] }
+  }
+]
 ```
 
-### Commands
+## How it works
 
-| Command | Description |
-|---------|-------------|
-| `npm run build` | Full build (TS + WASM) |
-| `npm run build:wasm` | Build WASM only |
-| `npm run test` | Run all tests |
-| `npm run test:node` | Node integration tests |
-| `npm run test:browser` | Browser integration tests |
-| `npm run lint` | Lint with Biome |
-| `npm run lint:fix` | Auto-fix lint issues |
-| `npm run format` | Format with Biome |
+```
+shellcheck/ (v0.11.0 submodule, unmodified)
+  └─ wasm/Main.hs + wasm/ShellCheck/Wasm/*
+       │  wasm32-wasi-ghc 9.10 (ghc-wasm-meta, FLAVOUR=9.10)
+       │  -no-hs-main -optl-mexec-model=reactor
+       ▼
+dist/shellcheck.wasm  (~17 MB, WASI reactor)
+dist/shellcheck.js    (post-link.mjs JSFFI glue)
+       │  src/runtime/{node,browser}.ts
+       ▼
+  lint(script, options?) → Promise<LintResult[]>
+```
 
-### Project Structure
+Key design points:
+
+- **Single entry point.** The Haskell layer calls `ShellCheck.Checker.checkScript` directly and maps `CheckResult` to JSON. No CLI parsing, no formatters, no filesystem access inside the module.
+- **In-memory filesystem.** `source` directives resolve against the `files` option map; there is no host filesystem access from WASM. Each `lint` call builds a fresh interface, so concurrent or repeated calls share no state.
+- **Reactor lifecycle.** Callers must `_initialize` once, then `hs_init(0, 0)`, then `await` the async exports. Both runtimes implement exactly this sequence; see the GHC user's guide section on JavaScript FFI in the wasm backend.
+- **No regex shim.** `regex-tdfa` is pure Haskell and compiles to `wasm32-wasi` unmodified.
+- **One WASI implementation.** Both runtimes use `@bjorn3/browser_wasi_shim`. Node's builtin `node:wasi` was tried and aborts reactor initialization with an opaque exit-code throw; the shim initializes cleanly in both environments.
+
+## Building the WASM module
+
+Requires the prebuilt GHC WASM toolchain (a stock `ghcup` GHC is single-target and cannot emit `wasm32-wasi`):
+
+```bash
+# One-time toolchain install (Linux x86_64, no compilation, ~1 GB)
+curl https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta/-/raw/master/bootstrap.sh | sh
+source ~/.ghc-wasm/env
+
+npm run build:wasm
+```
+
+`scripts/build-wasm.sh` builds `exe:shellcheck-wasm` with the `wasm32-wasi-cabal` wrapper, then runs GHC's `post-link.mjs` to generate the JSFFI glue. Output lands in `dist/`. Use `cabal` <= 3.14 with the wrapper (3.16 has a known regression with this toolchain).
+
+## Development
+
+```bash
+npm install          # install JS dependencies
+npm run build        # tsc (WASM step requires the toolchain; see above)
+npm test             # Node suites: unit + integration + browser-path-over-HTTP
+npm run test:browser # real headless Chromium via @vitest/browser + Playwright
+npm run lint         # Biome check
+npm run lint:fix     # Biome check --write
+```
+
+Git hooks (Husky + lint-staged) run Biome on staged JS/TS files at commit and the test suite on push.
+
+### Test matrix
+
+| Suite | Environment | What it covers |
+|---|---|---|
+| `api.test.ts` | Node | Type shapes, response envelopes |
+| `node.test.ts` | Node + built `.wasm` | SC2086/SC2164/SC3043 detection, severity/include/exclude filters, shell override, virtual `source` files, fix data |
+| `browser-serve.test.ts` | Node + local HTTP | `BrowserShellCheck` fetching `.wasm` over HTTP |
+| `browser.test.ts` | Real headless Chromium | Full browser path: fetch, instantiate, lint, options |
+
+Integration suites skip automatically when `dist/shellcheck.wasm` is absent.
+
+### Project structure
 
 ```
 shellcheck-wasm/
 ├── src/
-│   ├── index.ts              # Main entry point
-│   ├── api.ts                # Public API
-│   ├── types.ts              # TypeScript types
+│   ├── index.ts              # public entry point
+│   ├── api.ts                # createShellCheck / lint / resetShellCheck
+│   ├── types.ts              # LintOptions, LintResult
+│   ├── vitest-provided.d.ts  # ProvidedContext augmentation for browser tests
 │   ├── runtime/
-│   │   ├── node.ts           # Node.js runtime (wasmtime)
-│   │   └── browser.ts        # Browser runtime (WASI polyfill)
-│   └── __tests__/            # Vitest tests
+│   │   ├── node.ts           # Node loader (reads dist/ from disk)
+│   │   └── browser.ts        # browser loader (fetch + WASI shim)
+│   └── __tests__/            # Vitest suites
 ├── wasm/
-│   ├── Main.hs               # WASM entry point (JS FFI)
-│   └── ShellCheck/Wasm/      # Haskell WASM layer
-├── shellcheck/               # ShellCheck source (git submodule)
-├── scripts/                  # Build scripts
-├── dist/                     # Build output
-├── cabal.project             # Cabal config
-├── shellcheck-wasm.cabal     # WASM package
-├── package.json
-├── tsconfig.json
-├── biome.json
-├── vitest.config.ts
-└── .husky/                   # Git hooks
+│   ├── Main.hs               # stub (exports live in ShellCheck.Wasm.API)
+│   └── ShellCheck/Wasm/
+│       ├── API.hs            # foreign export javascript lint/lintWithOptions
+│       ├── SystemInterface.hs# in-memory SystemInterface
+│       └── Types.hs          # JSON types mirroring src/types.ts
+├── shellcheck/               # upstream ShellCheck v0.11.0 (submodule)
+├── test/
+│   ├── fixtures/             # .sh fixtures
+│   └── serve-dist.ts         # globalSetup: serves dist/ to browser tests
+├── scripts/                  # build-wasm.sh, copy-wasm.ts, gen-types.ts
+├── shellcheck-wasm.cabal
+├── cabal.project
+├── vitest.config.ts          # Node suites
+└── vitest.browser.config.ts  # Chromium suite
 ```
 
-## Building the WASM
+`dist/` (compiled JS, `.wasm`, glue, generated `.d.ts`) and `dist-newstyle/` are gitignored build outputs.
 
-The WASM is built using GHC's native `wasm32-wasi` backend:
+## Known limitations
 
-```bash
-# Requires wasm32-wasi-ghc in PATH
-npm run build:wasm
-```
-
-This produces:
-- `dist/shellcheck.wasm` — The WebAssembly module
-- `dist/shellcheck.js` — JS glue code (generated by GHC)
-- `dist/shellcheck.d.ts` — TypeScript definitions
-
-### Regex-tdfa Note
-
-ShellCheck depends on `regex-tdfa` which uses C FFI. The build uses a **JavaScript RegExp shim** via GHC's JS FFI when the `use-js-regex` cabal flag is enabled (default for WASM). This avoids linking C code and works in both browser and Node.
-
-## Testing
-
-```bash
-# Unit tests (no WASM required)
-npm run test
-
-# Node integration tests (requires built WASM)
-npm run test:node
-
-# Browser tests (run in browser or jsdom)
-npm run test:browser
-```
-
-Test fixtures are in `test/fixtures/` — add `.sh` files with expected behaviors.
+- The 17 MB module takes a few seconds to fetch and instantiate on first use; reuse the instance returned by `createShellCheck`.
+- `externalSources`/`sourcePaths` are accepted but only virtual `files` can actually be resolved — the module has no host filesystem access.
+- Exceptions inside the checker surface as an empty result array rather than a rejected promise; validate options client-side.
+- Browser testing covers headless Chromium. Other engines should work (the module only needs post-MVP features all modern browsers ship), but they are not in the matrix.
 
 ## License
 
-GPL-3.0-or-later — Same as ShellCheck.
-
-ShellCheck is copyright Vidar Holen and contributors.
-This WASM wrapper is a derivative work.
-
-## Credits
-
-- **ShellCheck** by Vidar Holen et al. — https://www.shellcheck.net/
-- **GHC WASM Backend** by Cheng Shao, Tweag, and GHC team
-- **wasmtime** / **@wasmer/wasi** for runtime support
+GPL-3.0-or-later, same as ShellCheck. ShellCheck is copyright Vidar Holen and contributors; this wrapper is a derivative work.
