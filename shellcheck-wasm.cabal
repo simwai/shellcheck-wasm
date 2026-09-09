@@ -1,0 +1,53 @@
+cabal-version: 3.0
+name: shellcheck-wasm
+version: 0.1.0.0
+synopsis: ShellCheck WebAssembly build
+license: GPL-3.0-or-later
+license-file: LICENSE
+author: ShellCheck Authors
+maintainer: vidar@vidarholen.net
+homepage: https://www.shellcheck.net/
+bug-reports: https://github.com/koalaman/shellcheck/issues
+category: Static Analysis
+build-type: Simple
+tested-with: GHC == 9.10.1, GHC == 9.12.2, GHC == 9.14.1
+
+-- NOTE: This package must be built with the wasm32-wasi cross compiler
+-- from ghc-wasm-meta (https://github.com/haskell-wasm/ghc-wasm-meta),
+-- e.g. via the wasm32-wasi-cabal wrapper. A stock ghcup GHC cannot
+-- produce wasm32-wasi output (GHC is single-target).
+--
+-- regex-tdfa needs no shim: it is pure Haskell, no C FFI.
+
+executable shellcheck-wasm
+  main-is: Main.hs
+  hs-source-dirs: wasm
+  other-modules:
+    ShellCheck.Wasm.API
+    ShellCheck.Wasm.SystemInterface
+    ShellCheck.Wasm.Types
+  build-depends:
+    base >= 4.18 && < 4.23,
+    aeson >= 2.1 && < 2.3,
+    bytestring >= 0.11 && < 0.13,
+    containers >= 0.6 && < 0.8,
+    filepath >= 1.4 && < 1.6,
+    text >= 2.0 && < 2.2,
+    ghc-experimental,
+    -- NOTE: exact case matters; the solver matches "ShellCheck", not "shellcheck".
+    ShellCheck
+  default-language: GHC2021
+  ghc-options:
+    -Wall
+    -Wcompat
+    -Wincomplete-record-updates
+    -Wincomplete-uni-patterns
+    -Wmissing-export-lists
+    -Wpartial-fields
+    -- GHC WASM backend: build a WASI reactor module with explicit exports.
+    -- See https://github.com/haskell-wasm/ghc-wasm-meta#compiling-to-wasi-reactor-module-with-user-specified-exports
+    -no-hs-main
+    -optl-mexec-model=reactor
+    -optl-Wl,--export=hs_init
+    -optl-Wl,--export=lint
+    -optl-Wl,--export=lintWithOptions

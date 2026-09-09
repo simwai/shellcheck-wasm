@@ -1,0 +1,30 @@
+packages:
+  .
+  shellcheck
+
+-- IMPORTANT: build with the wasm32-wasi cross compiler from ghc-wasm-meta,
+-- not with stock ghcup GHC (GHC is single-target, stock bindists cannot
+-- emit wasm32-wasi). Install via:
+--
+--   curl https://gitlab.haskell.org/haskell-wasm/ghc-wasm-meta/-/raw/master/bootstrap.sh | sh
+--   source ~/.ghc-wasm/env
+--
+-- then:
+--
+--   wasm32-wasi-cabal build exe:shellcheck-wasm
+--
+-- or equivalently with stock cabal (<= 3.14; 3.16 has a regression):
+--
+--   cabal --with-compiler=wasm32-wasi-ghc --with-hc-pkg=wasm32-wasi-ghc-pkg \
+--         --with-hsc2hs=wasm32-wasi-hsc2hs build exe:shellcheck-wasm
+--
+-- Do NOT pass -fwasm or --target=wasm32-wasi: neither exists as a
+-- GHC/cabal flag. The target is selected by the cross compiler itself.
+
+optimization: 2
+
+-- ShellCheck 0.11 bounds predate GHC 9.10+; allow newer boot libs.
+allow-newer:
+  base, aeson, array, bytestring, containers, deepseq,
+  directory, fgl, filepath, mtl, parsec, QuickCheck,
+  regex-tdfa, transformers

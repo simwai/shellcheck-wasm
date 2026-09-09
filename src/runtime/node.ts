@@ -1,0 +1,143 @@
+/**
+ * Node.js runtime for shellcheck-wasm.
+ *
+ * Loads the WASI *reactor* module built by scripts/build-wasm.sh together
+ * with its post-link JSFFI glue (dist/shellcheck.js), following the GHC
+ * user's guide ("JavaScript FFI in the wasm backend"):
+ *
+ *   1. import glue default export, call it with a mutable __exports object
+ *   2. instantiate with { ghc_wasm_jsffi, wasi_snapshot_preview1 }
+ *   3. Object.assign(__exports, instance.exports)  (knot-tying)
+ *   4. wasi.initialize(instance)  (calls reactor _initialize once)
+ *   5. hs_init(0, 0) before any other export
+ *   6. await instance.exports.lint*(...)  (async JSFFI exports)
+ *
+ * NOTE: uses @bjorn3/browser_wasi_shim rather than node:wasi — Node's
+ * builtin WASI aborts reactor _initialize with an opaque exit-code throw,
+ * while the shim initializes cleanly. Same shim as the browser runtime.
+ */
+
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { ConsoleStdout, File, OpenFile, WASI } from '@bjorn3/browser_wasi_shim';
+import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+interface ReactorExports extends WebAssembly.Exports {
+  memory: WebAssembly.Memory;
+  _initialize(): void;
+  hs_init(argc: number, argv: number): void;
+  lint(script: string): Promise<string>;
+  lintWithOptions(script: string, optionsJson: string): Promise<string>;
+}
+
+export class NodeShellCheck implements ShellCheckWasmInstance {
+  private exports: ReactorExports | null = null;
+  private initialized = false;
+
+  constructor(
+    private wasmPath: string,
+    private jsPath: string
+  ) {}
+
+  async initialize(): Promise<void> {
+    if (this.initialized) return;
+
+    if (!fs.existsSync(this.wasmPath) || !fs.existsSync(this.jsPath)) {
+      throw new Error(
+        `shellcheck.wasm not built (missing ${this.wasmPath} or ${this.jsPath}). Run: npm run build:wasm`
+      );
+    }
+
+    const wasmBytes = fs.readFileSync(this.wasmPath);
+
+    const fds = [
+      new OpenFile(new File([])),
+      ConsoleStdout.lineBuffered((msg) => console.log(`[shellcheck stdout] ${msg}`)),
+      ConsoleStdout.lineBuffered((msg) => console.warn(`[shellcheck stderr] ${msg}`)),
+    ];
+    const wasi = new WASI([], [], fds);
+
+    // Post-link glue: default export builds ghc_wasm_jsffi imports.
+    const jsModule = (await import(pathToFileURL(this.jsPath).href)) as {
+      default: (exports: unknown) => Record<string, WebAssembly.ImportValue>;
+    };
+    const jsffiWasmImports: Record<string, unknown> = {};
+    const jsffi = jsModule.default(jsffiWasmImports);
+
+    const { instance } = await WebAssembly.instantiate(wasmBytes, {
+      ghc_wasm_jsffi: jsffi,
+      wasi_snapshot_preview1: wasi.wasiImport,
+    } as WebAssembly.Imports);
+
+    // Knot-tying: give the JSFFI imports access to the final exports.
+    Object.assign(jsffiWasmImports, instance.exports);
+
+    // Reactor _initialize (once), then RTS init.
+    wasi.initialize(
+      instance as unknown as {
+        exports: { memory: WebAssembly.Memory; _initialize?: () => unknown };
+      }
+    );
+    const exports = instance.exports as unknown as ReactorExports;
+    exports.hs_init(0, 0);
+
+    this.exports = exports;
+    this.initialized = true;
+  }
+
+  private requireExports(): ReactorExports {
+    if (!this.initialized || !this.exports) throw new Error('Not initialized');
+    return this.exports;
+  }
+
+  async lint(script: string, options?: LintOptions): Promise<LintResult[]> {
+    if (!this.initialized) await this.initialize();
+    const exports = this.requireExports();
+    const json = await exports.lintWithOptions(script, JSON.stringify(options ?? {}));
+    return parseLintResponse(json);
+  }
+
+  async lintWithOptions(script: string, options: LintOptions): Promise<LintResult[]> {
+    return this.lint(script, options);
+  }
+
+  terminate(): void {
+    this.exports = null;
+    this.initialized = false;
+  }
+}
+
+export function parseLintResponse(json: string): LintResult[] {
+  const result = JSON.parse(json) as unknown;
+  if (Array.isArray(result)) return result as LintResult[];
+  if (typeof result === 'object' && result !== null && 'error' in result) {
+    throw new Error(String((result as { error: unknown }).error));
+  }
+  throw new Error('Unexpected response format');
+}
+
+let cachedInstance: NodeShellCheck | null = null;
+
+export async function createShellCheck(wasmPath?: string): Promise<ShellCheckWasmInstance> {
+  if (cachedInstance) return cachedInstance;
+
+  const defaultWasm = path.resolve(__dirname, '../../dist/shellcheck.wasm');
+  const finalWasm = wasmPath ?? defaultWasm;
+  const finalJs = path.resolve(path.dirname(finalWasm), 'shellcheck.js');
+
+  const instance = new NodeShellCheck(finalWasm, finalJs);
+  await instance.initialize();
+  cachedInstance = instance;
+  return instance;
+}
+
+export function resetCache(): void {
+  if (cachedInstance) {
+    cachedInstance.terminate();
+    cachedInstance = null;
+  }
+}
