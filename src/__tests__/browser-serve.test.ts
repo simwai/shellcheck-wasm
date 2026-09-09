@@ -1,15 +1,3 @@
-/**
- * Browser runtime path test (runs in Node).
- *
- * Spins up a local HTTP server for dist/ and drives the real
- * BrowserShellCheck class against it: the .wasm module is fetched over
- * HTTP exactly like in a browser, instantiated with the WASI shim, and
- * linted. (Only the glue import uses a file:// URL since Node cannot
- * import ESM over HTTP; the glue itself is identical in browsers.)
- *
- * Skipped when dist/shellcheck.wasm is not built.
- */
-
 import { existsSync, readFileSync } from 'node:fs';
 import { type Server, createServer } from 'node:http';
 import { resolve } from 'node:path';
@@ -59,7 +47,6 @@ describeIf('Browser runtime over HTTP', () => {
     }
     baseUrl = `http://127.0.0.1:${address.port}`;
 
-    // .wasm over HTTP (browser path); glue via file:// (Node ESM limit).
     const instance = new BrowserShellCheck(
       `${baseUrl}/shellcheck.wasm`,
       pathToFileURL(jsPath).href

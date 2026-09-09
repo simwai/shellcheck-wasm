@@ -1,14 +1,3 @@
-/**
- * Browser runtime for shellcheck-wasm.
- *
- * Same WASI *reactor* loading sequence as node.ts, but with
- * @bjorn3/browser_wasi_shim providing `wasi_snapshot_preview1`
- * (Node's builtin WASI is unavailable in browsers).
- *
- * The caller must serve dist/shellcheck.wasm and dist/shellcheck.js
- * (post-link JSFFI glue) from the same origin (or with CORS).
- */
-
 import { ConsoleStdout, File, OpenFile, WASI } from '@bjorn3/browser_wasi_shim';
 import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js';
 
@@ -39,7 +28,6 @@ export class BrowserShellCheck implements ShellCheckWasmInstance {
     ];
     const wasi = new WASI([], [], fds);
 
-    // Post-link glue: default export builds ghc_wasm_jsffi imports.
     const jsModule = (await import(/* @vite-ignore */ this.jsUrl)) as {
       default: (exports: unknown) => Record<string, WebAssembly.ImportValue>;
     };
@@ -57,10 +45,8 @@ export class BrowserShellCheck implements ShellCheckWasmInstance {
       wasi_snapshot_preview1: wasi.wasiImport,
     } as WebAssembly.Imports);
 
-    // Knot-tying: give the JSFFI imports access to the final exports.
     Object.assign(jsffiWasmImports, instance.exports);
 
-    // Reactor _initialize (once), then RTS init.
     wasi.initialize(
       instance as unknown as {
         exports: { memory: WebAssembly.Memory; _initialize?: () => unknown };

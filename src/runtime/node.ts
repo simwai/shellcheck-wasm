@@ -1,22 +1,3 @@
-/**
- * Node.js runtime for shellcheck-wasm.
- *
- * Loads the WASI *reactor* module built by scripts/build-wasm.sh together
- * with its post-link JSFFI glue (dist/shellcheck.js), following the GHC
- * user's guide ("JavaScript FFI in the wasm backend"):
- *
- *   1. import glue default export, call it with a mutable __exports object
- *   2. instantiate with { ghc_wasm_jsffi, wasi_snapshot_preview1 }
- *   3. Object.assign(__exports, instance.exports)  (knot-tying)
- *   4. wasi.initialize(instance)  (calls reactor _initialize once)
- *   5. hs_init(0, 0) before any other export
- *   6. await instance.exports.lint*(...)  (async JSFFI exports)
- *
- * NOTE: uses @bjorn3/browser_wasi_shim rather than node:wasi — Node's
- * builtin WASI aborts reactor _initialize with an opaque exit-code throw,
- * while the shim initializes cleanly. Same shim as the browser runtime.
- */
-
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -61,7 +42,6 @@ export class NodeShellCheck implements ShellCheckWasmInstance {
     ];
     const wasi = new WASI([], [], fds);
 
-    // Post-link glue: default export builds ghc_wasm_jsffi imports.
     const jsModule = (await import(pathToFileURL(this.jsPath).href)) as {
       default: (exports: unknown) => Record<string, WebAssembly.ImportValue>;
     };
@@ -73,10 +53,8 @@ export class NodeShellCheck implements ShellCheckWasmInstance {
       wasi_snapshot_preview1: wasi.wasiImport,
     } as WebAssembly.Imports);
 
-    // Knot-tying: give the JSFFI imports access to the final exports.
     Object.assign(jsffiWasmImports, instance.exports);
 
-    // Reactor _initialize (once), then RTS init.
     wasi.initialize(
       instance as unknown as {
         exports: { memory: WebAssembly.Memory; _initialize?: () => unknown };

@@ -1,21 +1,9 @@
-/**
- * Main API entry point for shellcheck-wasm
- * Automatically selects the appropriate runtime (Node or Browser)
- */
-
 import type { LintOptions, LintResult, ShellCheckWasmInstance } from './types.js';
 
 let runtimeInstance: ShellCheckWasmInstance | null = null;
 
-/**
- * Create a ShellCheck WASM instance
- * @param options - Configuration options
- * @returns ShellCheck instance for linting
- */
 export async function createShellCheck(options?: {
-  /** Path or URL to the WASM file */
   wasmUrl?: string;
-  /** Force a specific runtime ('node' or 'browser') */
   runtime?: 'node' | 'browser' | 'auto';
 }): Promise<ShellCheckWasmInstance> {
   if (runtimeInstance) return runtimeInstance;
@@ -44,31 +32,16 @@ export async function createShellCheck(options?: {
   return instance;
 }
 
-/**
- * Lint a shell script (convenience function)
- * @param script - Shell script to lint
- * @param options - Lint options
- * @returns Array of lint results
- */
 export async function lint(script: string, options?: LintOptions): Promise<LintResult[]> {
   const shellcheck = await createShellCheck();
   return shellcheck.lint(script, options);
 }
 
-/**
- * Lint a shell script with options object
- * @param script - Shell script to lint
- * @param options - Lint options
- * @returns Array of lint results
- */
 export async function lintWithOptions(script: string, options: LintOptions): Promise<LintResult[]> {
   const shellcheck = await createShellCheck();
   return shellcheck.lintWithOptions(script, options);
 }
 
-/**
- * Reset the cached instance (useful for testing)
- */
 export function resetShellCheck(): void {
   if (runtimeInstance) {
     runtimeInstance.terminate();
@@ -76,7 +49,6 @@ export function resetShellCheck(): void {
   }
 }
 
-// Re-export types
 export type {
   LintOptions,
   LintResult,

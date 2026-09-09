@@ -1,11 +1,6 @@
-/**
- * Unit tests for the TypeScript API (mocked)
- */
-
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { LintOptions, LintResult } from '../types.js';
 
-// Mock the WASM module
 vi.mock('../runtime/node.js', () => ({
   createShellCheck: vi.fn(),
   resetCache: vi.fn(),

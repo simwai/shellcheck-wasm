@@ -1,7 +1,4 @@
 #!/usr/bin/env tsx
-/**
- * Copy WASM artifacts to dist/ and ensure they're accessible
- */
 
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -12,11 +9,10 @@ const __dirname = dirname(__filename);
 const projectRoot = resolve(__dirname, '..');
 
 const distDir = resolve(projectRoot, 'dist');
-const srcDistDir = resolve(projectRoot, 'dist'); // Same for now
+const srcDistDir = resolve(projectRoot, 'dist');
 
 mkdirSync(distDir, { recursive: true });
 
-// Files to copy from build output to final dist
 const files = [
   { src: 'shellcheck.wasm', dest: 'shellcheck.wasm' },
   { src: 'shellcheck.js', dest: 'shellcheck.js' },
@@ -35,7 +31,6 @@ for (const file of files) {
   }
 }
 
-// Create a minimal wasi-polyfill.js for browser if it doesn't exist
 const polyfillPath = resolve(distDir, 'wasi-polyfill.js');
 if (!existsSync(polyfillPath)) {
   const polyfill = `/**
