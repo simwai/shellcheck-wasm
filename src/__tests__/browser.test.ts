@@ -1,15 +1,13 @@
 /**
- * Browser integration tests for shellcheck-wasm
- * These tests run in a browser-like environment (jsdom)
+ * Browser integration tests for shellcheck-wasm.
+ * These run in real Chromium via @vitest/browser (Playwright).
  * Run with: npm run test:browser
  */
 
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest';
 import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js';
 
-// These tests are designed to run in a browser environment
-// They will be skipped in Node unless jsdom is configured
-
+// Only a real browser provides window/document; skipped in Node runs.
 const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
 
 const describeIf = isBrowser ? describe : describe.skip;
@@ -19,14 +17,15 @@ describeIf('Browser Integration Tests', () => {
 
   beforeAll(async () => {
     if (!isBrowser) {
-      console.warn('⚠️  Not in browser environment, skipping browser tests');
+      console.warn('Not in browser environment, skipping browser tests');
       return;
     }
 
+    // WASM URL is served by test/serve-dist.ts (globalSetup).
+    const wasmUrl = inject('wasmUrl') as string;
     const { createShellCheck } = await import('../runtime/browser.js');
-    // In browser, the WASM is served from the same origin
-    shellcheck = await createShellCheck('/shellcheck.wasm');
-  }, 60000);
+    shellcheck = await createShellCheck(wasmUrl);
+  }, 120000);
 
   const getShellcheck = () => {
     if (!shellcheck) throw new Error('shellcheck not initialized');
@@ -55,16 +54,20 @@ echo $VAR`;
     expect(results.length).toBeGreaterThan(0);
     const sc2086 = results.find((r) => r.code === 2086);
     expect(sc2086).toBeDefined();
-    expect(sc2086?.severity).toBe('warning');
+    expect(sc2086?.severity).toBe('info');
   });
 
   it('should filter by severity option', async () => {
     const script = `#!/bin/bash
 echo $VAR`;
 
-    // SC2086 is warning - should be filtered out with severity=error
+    // SC2086 is info - should be filtered out with severity=error
     const results = await getShellcheck().lint(script, { severity: 'error' });
     expect(results).toEqual([]);
+
+    // Should appear with severity=info
+    const results2 = await getShellcheck().lint(script, { severity: 'info' });
+    expect(results2.length).toBeGreaterThan(0);
   });
 
   it('should work with virtual files for sourced scripts', async () => {
