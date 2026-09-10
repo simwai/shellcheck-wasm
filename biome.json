@@ -36,6 +36,14 @@
     }
   },
   "files": {
-    "ignore": ["dist/", "shellcheck/", "*.wasm", "*.cabal", "dist-newstyle/", ".cabal/"]
+    "ignore": [
+      "dist/",
+      "shellcheck/",
+      "*.wasm",
+      "*.cabal",
+      "dist-newstyle/",
+      ".cabal/",
+      "build.config.ts"
+    ]
   }
 }

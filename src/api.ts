@@ -5,8 +5,9 @@ let runtimeInstance: ShellCheckWasmInstance | null = null;
 export async function createShellCheck(options?: {
   wasmUrl?: string;
   runtime?: 'node' | 'browser' | 'auto';
+  forceNew?: boolean;
 }): Promise<ShellCheckWasmInstance> {
-  if (runtimeInstance) return runtimeInstance;
+  if (runtimeInstance && !options?.forceNew) return runtimeInstance;
 
   const isNode = typeof process !== 'undefined' && process.versions?.node;
   const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
@@ -20,10 +21,16 @@ export async function createShellCheck(options?: {
 
   if (runtime === 'node') {
     const { createShellCheck: createNodeShellCheck } = await import('./runtime/node.js');
-    instance = await createNodeShellCheck(options?.wasmUrl);
+    instance = await createNodeShellCheck({
+      wasmPath: options?.wasmUrl,
+      forceNew: options?.forceNew,
+    });
   } else if (runtime === 'browser') {
     const { createShellCheck: createBrowserShellCheck } = await import('./runtime/browser.js');
-    instance = await createBrowserShellCheck(options?.wasmUrl);
+    instance = await createBrowserShellCheck({
+      wasmUrl: options?.wasmUrl,
+      forceNew: options?.forceNew,
+    });
   } else {
     throw new Error(`Unknown runtime: ${runtime}`);
   }
@@ -32,6 +39,10 @@ export async function createShellCheck(options?: {
   return instance;
 }
 
+/**
+ * @deprecated Use `lintWithOptions` instead. This convenience wrapper calls
+ * `lintWithOptions` with default options and will be removed in a future version.
+ */
 export async function lint(script: string, options?: LintOptions): Promise<LintResult[]> {
   const shellcheck = await createShellCheck();
   return shellcheck.lint(script, options);

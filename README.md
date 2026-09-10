@@ -2,7 +2,7 @@
 
 ShellCheck 0.11 compiled to WebAssembly, with a typed TypeScript API for Node.js and browsers.
 
-The module is built with GHC's WebAssembly backend (`wasm32-wasi`) as a WASI reactor exposing two async JSFFI exports, `lint` and `lintWithOptions`. Both runtimes load the same artifact; the only difference is how the WASI imports are provided.
+The module is built with GHC's WebAssembly backend (`wasm32-wasi`) as a WASI reactor exposing the async JSFFI export `lintWithOptions` (and `getVersion` for cache invalidation). Both runtimes load the same artifact; the only difference is how the WASI imports are provided.
 
 ## Requirements
 
@@ -24,14 +24,14 @@ npm install
 ### Node.js
 
 ```typescript
-import { createShellCheck, lint } from 'shellcheck-wasm';
+import { createShellCheck, lintWithOptions } from 'shellcheck-wasm';
 
 // One-shot
-const results = await lint('echo $UNQUOTED_VAR');
+const results = await lintWithOptions('echo $UNQUOTED_VAR', { severity: 'warning' });
 
 // Reusable instance (module is instantiated once and reused)
 const shellcheck = await createShellCheck();
-const results2 = await shellcheck.lint('echo $VAR', { severity: 'warning' });
+const results2 = await shellcheck.lintWithOptions('echo $VAR', { severity: 'warning' });
 ```
 
 By default the loader resolves `dist/shellcheck.wasm` relative to the package. Pass an explicit path when needed:
@@ -42,41 +42,48 @@ const shellcheck = await createShellCheck({ wasmUrl: '/path/to/shellcheck.wasm' 
 
 ### Browser
 
-Serve `dist/shellcheck.wasm` and `dist/shellcheck.js` from the same origin with correct MIME types (`application/wasm` for the `.wasm` file), then:
+Serve `dist/shellcheck.wasm` and `dist/shellcheck.js` from the same origin with correct MIME types (`application/wasm` for the `.wasm` file, `text/javascript` for `.js`), then:
 
 ```typescript
 import { createShellCheck } from 'shellcheck-wasm';
 
 const shellcheck = await createShellCheck({ wasmUrl: '/shellcheck.wasm' });
-const results = await shellcheck.lint(editorValue);
+const results = await shellcheck.lintWithOptions(editorValue, { severity: 'warning' });
 console.log(results);
 ```
 
 `wasmUrl` may be any absolute or relative URL. The companion `shellcheck.js` (post-link JSFFI glue) is resolved by replacing the `.wasm` suffix with `.js`.
 
+> **Important:** The `.wasm` file must be served with `Content-Type: application/wasm`, otherwise the browser will refuse to instantiate it. The test suite validates this requirement (see `browser-serve.test.ts`).
+
 ## API reference
 
 ### `createShellCheck(options?)`
 
-Creates (or returns the cached) ShellCheck instance, instantiating the WASM module on first call.
+Creates (or returns the cached) ShellCheck instance, instantiating the WASM module on first call. Uses version-based cache invalidation; pass `forceNew: true` to bypass.
 
 ```typescript
 await createShellCheck(options?: {
   wasmUrl?: string;              // path or URL of shellcheck.wasm
   runtime?: 'node' | 'browser' | 'auto';  // default 'auto'
+  forceNew?: boolean;            // bypass version cache (default false)
 });
+```
+
+### `lintWithOptions(script, options)`
+
+```typescript
+await lintWithOptions('echo $VAR', { severity: 'error' });   // filtered
+await lintWithOptions('echo $VAR', { exclude: [2086] });     // suppress SC2086
 ```
 
 ### `lint(script, options?)`
 
 ```typescript
-await lint('echo $VAR');                          // LintResult[]
-await lint('echo $VAR', { severity: 'error' });   // filtered
+await lint('echo $VAR');                          // LintResult[] (deprecated)
 ```
 
-### `lintWithOptions(script, options)`
-
-Same as `lint` with required options object.
+> **Deprecated:** Use `lintWithOptions` instead. This convenience wrapper will be removed in a future version.
 
 ### `resetShellCheck()`
 
@@ -90,8 +97,6 @@ interface LintOptions {
   severity?: 'error' | 'warning' | 'info' | 'style';
   exclude?: number[];      // warning codes to suppress, e.g. [2086]
   include?: number[];      // if set, only these codes are reported
-  externalSources?: boolean;
-  sourcePaths?: string[];
   files?: Record<string, string>;  // virtual files for `source` directives
 }
 ```
@@ -182,7 +187,7 @@ npm run build:wasm
 
 ```bash
 npm install          # install JS dependencies
-npm run build        # tsc (WASM step requires the toolchain; see above)
+npm run build        # builds WASM + TypeScript (via unbuild)
 npm test             # Node suites: unit + integration + browser-path-over-HTTP
 npm run test:browser # real headless Chromium via @vitest/browser + Playwright
 npm run lint         # Biome check
@@ -208,24 +213,26 @@ Integration suites skip automatically when `dist/shellcheck.wasm` is absent.
 shellcheck-wasm/
 ├── src/
 │   ├── index.ts              # public entry point
-│   ├── api.ts                # createShellCheck / lint / resetShellCheck
+│   ├── api.ts                # createShellCheck / lintWithOptions / resetShellCheck
 │   ├── types.ts              # LintOptions, LintResult
 │   ├── vitest-provided.d.ts  # ProvidedContext augmentation for browser tests
 │   ├── runtime/
 │   │   ├── node.ts           # Node loader (reads dist/ from disk)
-│   │   └── browser.ts        # browser loader (fetch + WASI shim)
+│   │   ├── browser.ts        # browser loader (fetch + WASI shim)
+│   │   └── utils.ts          # shared parseLintResponse
 │   └── __tests__/            # Vitest suites
 ├── wasm/
 │   ├── Main.hs               # stub (exports live in ShellCheck.Wasm.API)
 │   └── ShellCheck/Wasm/
-│       ├── API.hs            # foreign export javascript lint/lintWithOptions
+│       ├── API.hs            # foreign export javascript lintWithOptions/getVersion
 │       ├── SystemInterface.hs# in-memory SystemInterface
 │       └── Types.hs          # JSON types mirroring src/types.ts
 ├── shellcheck/               # upstream ShellCheck v0.11.0 (submodule)
 ├── test/
 │   ├── fixtures/             # .sh fixtures
 │   └── serve-dist.ts         # globalSetup: serves dist/ to browser tests
-├── scripts/                  # build-wasm.sh, copy-wasm.ts, gen-types.ts
+├── scripts/                  # build-wasm.sh
+├── build.config.ts           # unbuild configuration
 ├── shellcheck-wasm.cabal
 ├── cabal.project
 ├── vitest.config.ts          # Node suites
@@ -237,8 +244,8 @@ shellcheck-wasm/
 ## Known limitations
 
 - The 17 MB module takes a few seconds to fetch and instantiate on first use; reuse the instance returned by `createShellCheck`.
-- `externalSources`/`sourcePaths` are accepted but only virtual `files` can actually be resolved — the module has no host filesystem access.
-- Exceptions inside the checker surface as an empty result array rather than a rejected promise; validate options client-side.
+- The module has no host filesystem access; only virtual `files` can be resolved for `source` directives.
+- Exceptions inside the checker surface as rejected promises; validate options client-side.
 - Browser testing covers headless Chromium. Other engines should work (the module only needs post-MVP features all modern browsers ship), but they are not in the matrix.
 
 ## License

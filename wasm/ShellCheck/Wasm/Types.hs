@@ -35,8 +35,6 @@ data LintOptions = LintOptions
   , optSeverity :: Maybe Text
   , optExclude :: Maybe [Integer]
   , optInclude :: Maybe [Integer]
-  , optExternalSources :: Maybe Bool
-  , optSourcePaths :: Maybe [Text]
   , optFiles :: Maybe (Map Text Text)
   } deriving (Show, Eq, Generic)
 
@@ -54,8 +52,6 @@ defaultLintOptions = LintOptions
   , optSeverity = Nothing
   , optExclude = Nothing
   , optInclude = Nothing
-  , optExternalSources = Nothing
-  , optSourcePaths = Nothing
   , optFiles = Nothing
   }
 

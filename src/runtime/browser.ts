@@ -1,12 +1,13 @@
 import { ConsoleStdout, File, OpenFile, WASI } from '@bjorn3/browser_wasi_shim';
 import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js';
+import { parseLintResponse } from './utils.js';
 
 interface ReactorExports extends WebAssembly.Exports {
   memory: WebAssembly.Memory;
   _initialize(): void;
   hs_init(argc: number, argv: number): void;
-  lint(script: string): Promise<string>;
   lintWithOptions(script: string, optionsJson: string): Promise<string>;
+  getVersion(): Promise<string>;
 }
 
 export class BrowserShellCheck implements ShellCheckWasmInstance {
@@ -79,27 +80,40 @@ export class BrowserShellCheck implements ShellCheckWasmInstance {
     this.exports = null;
     this.initialized = false;
   }
-}
 
-export function parseLintResponse(json: string): LintResult[] {
-  const result = JSON.parse(json) as unknown;
-  if (Array.isArray(result)) return result as LintResult[];
-  if (typeof result === 'object' && result !== null && 'error' in result) {
-    throw new Error(String((result as { error: unknown }).error));
+  async getVersion(): Promise<string> {
+    if (!this.initialized) await this.initialize();
+    const exports = this.requireExports();
+    return exports.getVersion();
   }
-  throw new Error('Unexpected response format');
 }
 
 let cachedInstance: BrowserShellCheck | null = null;
+let cachedVersion: string | null = null;
 
-export async function createShellCheck(wasmUrl?: string): Promise<ShellCheckWasmInstance> {
-  if (cachedInstance) return cachedInstance;
-
-  const finalWasm = wasmUrl ?? '/shellcheck.wasm';
+export async function createShellCheck(options?: {
+  wasmUrl?: string;
+  forceNew?: boolean;
+}): Promise<ShellCheckWasmInstance> {
+  const finalWasm = options?.wasmUrl ?? '/shellcheck.wasm';
   const finalJs = finalWasm.replace(/\.wasm($|\?)/, '.js$1');
+
+  // Check if we need to create a new instance
+  if (!options?.forceNew && cachedInstance && cachedVersion) {
+    const instance = new BrowserShellCheck(finalWasm, finalJs);
+    await instance.initialize();
+    const version = await instance.getVersion();
+    if (version === cachedVersion) {
+      instance.terminate();
+      return cachedInstance;
+    }
+    // Version mismatch, terminate old instance
+    cachedInstance.terminate();
+  }
 
   const instance = new BrowserShellCheck(finalWasm, finalJs);
   await instance.initialize();
+  cachedVersion = await instance.getVersion();
   cachedInstance = instance;
   return instance;
 }
@@ -108,5 +122,6 @@ export function resetCache(): void {
   if (cachedInstance) {
     cachedInstance.terminate();
     cachedInstance = null;
+    cachedVersion = null;
   }
 }

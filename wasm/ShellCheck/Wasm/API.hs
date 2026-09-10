@@ -14,11 +14,10 @@
 -- persist linear memory across calls; global Haskell state would leak
 -- virtual files between unrelated lint runs).
 module ShellCheck.Wasm.API
-  ( lint
-  , lintWithOptions
+  ( lintWithOptions
+  , getVersion
   ) where
 
-import Control.Exception (SomeException, try)
 import Data.Aeson (decodeStrict, encode)
 import Data.ByteString.Lazy.Char8 (unpack)
 import Data.Map.Strict (Map)
@@ -34,16 +33,6 @@ import ShellCheck.Wasm.SystemInterface (newMemorySystemInterface)
 import ShellCheck.Wasm.Types hiding (Replacement (..))
 import qualified ShellCheck.Wasm.Types as WT
 
--- | Lint a shell script with default options. Input and output are JSON
--- strings decoded/encoded with 'LintOptions'/'LintResult'.
-foreign export javascript "lint"
-  lint :: JSString -> IO JSString
-
-lint :: JSString -> IO JSString
-lint script = do
-  results <- checkTextIO (T.pack (fromJSString script)) defaultLintOptions
-  pure . toJSString . unpack $ encode results
-
 -- | Lint a shell script. First argument is the script source, second is a
 -- JSON-encoded 'LintOptions' object (e.g. @"{\"severity\":\"error\"}"@).
 foreign export javascript "lintWithOptions"
@@ -57,15 +46,20 @@ lintWithOptions script optionsJson = do
   opts = fromMaybe defaultLintOptions $
     decodeStrict (TE.encodeUtf8 (T.pack (fromJSString optionsJson)))
 
--- | Run the checker and return lint results. Exceptions (if any) surface
--- as an empty result rather than a wasm trap; callers that need errors
--- should validate options client-side.
+-- | Get version information for cache invalidation.
+foreign export javascript "getVersion"
+  getVersion :: IO JSString
+
+getVersion :: IO JSString
+getVersion = do
+  pure . toJSString $ "shellcheck-wasm-0.1.0 (ShellCheck 0.11.0)"
+
+-- | Run the checker and return lint results. Exceptions propagate to
+-- JavaScript as rejected promises (GHC JSFFI wraps IO in Promise).
 checkTextIO :: Text -> LintOptions -> IO [LintResult]
 checkTextIO script opts = do
-  outcome <- try (checkScript sys spec) :: IO (Either SomeException CheckResult)
-  pure $ case outcome of
-    Left _ -> []
-    Right result -> map toLintResult (crComments result)
+  result <- checkScript sys spec
+  pure $ map toLintResult (crComments result)
  where
   files :: Map FilePath String
   files = Map.mapKeys T.unpack . Map.map T.unpack $

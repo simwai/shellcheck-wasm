@@ -49,5 +49,5 @@ executable shellcheck-wasm
     -no-hs-main
     -optl-mexec-model=reactor
     -optl-Wl,--export=hs_init
-    -optl-Wl,--export=lint
     -optl-Wl,--export=lintWithOptions
+    -optl-Wl,--export=getVersion

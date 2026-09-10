@@ -3,6 +3,7 @@ import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { ConsoleStdout, File, OpenFile, WASI } from '@bjorn3/browser_wasi_shim';
 import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js';
+import { parseLintResponse } from './utils.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,8 +12,8 @@ interface ReactorExports extends WebAssembly.Exports {
   memory: WebAssembly.Memory;
   _initialize(): void;
   hs_init(argc: number, argv: number): void;
-  lint(script: string): Promise<string>;
   lintWithOptions(script: string, optionsJson: string): Promise<string>;
+  getVersion(): Promise<string>;
 }
 
 export class NodeShellCheck implements ShellCheckWasmInstance {
@@ -87,28 +88,41 @@ export class NodeShellCheck implements ShellCheckWasmInstance {
     this.exports = null;
     this.initialized = false;
   }
-}
 
-export function parseLintResponse(json: string): LintResult[] {
-  const result = JSON.parse(json) as unknown;
-  if (Array.isArray(result)) return result as LintResult[];
-  if (typeof result === 'object' && result !== null && 'error' in result) {
-    throw new Error(String((result as { error: unknown }).error));
+  async getVersion(): Promise<string> {
+    if (!this.initialized) await this.initialize();
+    const exports = this.requireExports();
+    return exports.getVersion();
   }
-  throw new Error('Unexpected response format');
 }
 
 let cachedInstance: NodeShellCheck | null = null;
+let cachedVersion: string | null = null;
 
-export async function createShellCheck(wasmPath?: string): Promise<ShellCheckWasmInstance> {
-  if (cachedInstance) return cachedInstance;
-
+export async function createShellCheck(options?: {
+  wasmPath?: string;
+  forceNew?: boolean;
+}): Promise<ShellCheckWasmInstance> {
   const defaultWasm = path.resolve(__dirname, '../../dist/shellcheck.wasm');
-  const finalWasm = wasmPath ?? defaultWasm;
+  const finalWasm = options?.wasmPath ?? defaultWasm;
   const finalJs = path.resolve(path.dirname(finalWasm), 'shellcheck.js');
+
+  // Check if we need to create a new instance
+  if (!options?.forceNew && cachedInstance && cachedVersion) {
+    const instance = new NodeShellCheck(finalWasm, finalJs);
+    await instance.initialize();
+    const version = await instance.getVersion();
+    if (version === cachedVersion) {
+      instance.terminate();
+      return cachedInstance;
+    }
+    // Version mismatch, terminate old instance
+    cachedInstance.terminate();
+  }
 
   const instance = new NodeShellCheck(finalWasm, finalJs);
   await instance.initialize();
+  cachedVersion = await instance.getVersion();
   cachedInstance = instance;
   return instance;
 }
@@ -117,5 +131,6 @@ export function resetCache(): void {
   if (cachedInstance) {
     cachedInstance.terminate();
     cachedInstance = null;
+    cachedVersion = null;
   }
 }

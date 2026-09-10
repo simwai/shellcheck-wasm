@@ -12,10 +12,6 @@ export interface LintOptions {
   exclude?: number[];
   /** Warning codes to include (only these) */
   include?: number[];
-  /** Allow sourcing files outside the input */
-  externalSources?: boolean;
-  /** Paths to search for sourced files */
-  sourcePaths?: string[];
   /** Virtual files for sourced scripts (path -> content) */
   files?: Record<string, string>;
 }
@@ -47,10 +43,12 @@ export interface LintResult {
 export type LintResponse = LintResult[] | { error: string };
 
 export interface ShellCheckWasmInstance {
-  /** Lint a shell script */
+  /** Lint a shell script (convenience wrapper, deprecated - use lintWithOptions) */
   lint(script: string, options?: LintOptions): Promise<LintResult[]>;
   /** Lint with pre-parsed options object */
   lintWithOptions(script: string, options: LintOptions): Promise<LintResult[]>;
+  /** Get version string for cache invalidation */
+  getVersion(): Promise<string>;
   /** Terminate the instance */
   terminate(): void;
 }
