@@ -1,7 +1,5 @@
 # Build outputs
-dist/
 dist-newstyle/
-*.wasm
 *.js.map
 
 # Cabal

@@ -20,9 +20,11 @@
       "types": "./dist/runtime/browser.d.ts"
     }
   },
+  "files": ["dist"],
   "scripts": {
     "build": "npm run build:wasm && unbuild",
     "build:wasm": "bash scripts/build-wasm.sh",
+    "prepublishOnly": "npm run build",
     "test": "vitest run",
     "test:node": "vitest run --pool=forks src/__tests__/node.test.ts",
     "test:browser": "vitest run --config vitest.browser.config.ts",

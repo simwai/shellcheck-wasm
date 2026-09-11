@@ -11,13 +11,23 @@ The module is built with GHC's WebAssembly backend (`wasm32-wasi`) as a WASI rea
 
 ## Installation
 
-The package is not published to npm yet. Use it from source:
-
 ```bash
-git clone --recurse-submodules <repo-url> shellcheck-wasm
-cd shellcheck-wasm
-npm install
+npm install shellcheck-wasm
 ```
+
+## Publishing
+
+This package is ready to publish to npm. Before publishing:
+
+1. Ensure the WASM build is current:
+   ```bash
+   npm run build
+   ```
+2. Commit the updated `dist/` artifacts.
+3. Publish:
+   ```bash
+   npm publish
+   ```
 
 ## Usage
 
