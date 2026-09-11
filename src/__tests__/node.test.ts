@@ -1,135 +1,135 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
-import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js';
+import { existsSync, readFileSync } from 'node:fs'
+import { resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = resolve(__filename, '..');
-const projectRoot = resolve(__dirname, '../..');
-const distDir = resolve(projectRoot, 'dist');
-const wasmPath = resolve(distDir, 'shellcheck.wasm');
-const fixturesDir = resolve(projectRoot, 'test/fixtures');
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = resolve(__filename, '..')
+const projectRoot = resolve(__dirname, '../..')
+const distDir = resolve(projectRoot, 'dist')
+const wasmPath = resolve(distDir, 'shellcheck.wasm')
+const fixturesDir = resolve(projectRoot, 'test/fixtures')
 
-const wasmExists = existsSync(wasmPath);
+const wasmExists = existsSync(wasmPath)
 
-const describeIf = wasmExists ? describe : describe.skip;
+const describeIf = wasmExists ? describe : describe.skip
 
 describeIf('Node.js Integration Tests', () => {
-  let shellcheck: ShellCheckWasmInstance | null = null;
+  let shellcheck: ShellCheckWasmInstance | null = null
 
   beforeAll(async () => {
     if (!wasmExists) {
-      console.warn('WASM not built, skipping Node integration tests');
-      return;
+      console.warn('WASM not built, skipping Node integration tests')
+      return
     }
 
-    const { createShellCheck } = await import('../runtime/node.js');
-    shellcheck = await createShellCheck({ wasmPath });
-  }, 60000);
+    const { createShellCheck } = await import('../runtime/node.js')
+    shellcheck = await createShellCheck({ wasmPath })
+  }, 60000)
 
   const getShellcheck = () => {
-    if (!shellcheck) throw new Error('shellcheck not initialized');
-    return shellcheck;
-  };
+    if (!shellcheck) throw new Error('shellcheck not initialized')
+    return shellcheck
+  }
 
   afterAll(() => {
     if (shellcheck) {
-      shellcheck.terminate();
+      shellcheck.terminate()
     }
-  });
+  })
 
   it('should lint a valid script with no warnings', async () => {
-    const script = readFileSync(resolve(fixturesDir, 'valid.sh'), 'utf-8');
-    const results = await getShellcheck().lint(script);
+    const script = readFileSync(resolve(fixturesDir, 'valid.sh'), 'utf-8')
+    const results = await getShellcheck().lint(script)
 
-    expect(results).toEqual([]);
-  });
+    expect(results).toEqual([])
+  })
 
   it('should detect SC2086 (unquoted variable)', async () => {
-    const script = readFileSync(resolve(fixturesDir, 'sc2086.sh'), 'utf-8');
-    const results = await getShellcheck().lint(script);
+    const script = readFileSync(resolve(fixturesDir, 'sc2086.sh'), 'utf-8')
+    const results = await getShellcheck().lint(script)
 
-    expect(results.length).toBeGreaterThan(0);
-    const sc2086 = results.find((r) => r.code === 2086);
-    expect(sc2086).toBeDefined();
-    expect(sc2086?.severity).toBe('info');
-    expect(sc2086?.message).toContain('Double quote');
-  });
+    expect(results.length).toBeGreaterThan(0)
+    const sc2086 = results.find((r) => r.code === 2086)
+    expect(sc2086).toBeDefined()
+    expect(sc2086?.severity).toBe('info')
+    expect(sc2086?.message).toContain('Double quote')
+  })
 
   it('should detect SC2164 (cd without error check)', async () => {
-    const script = readFileSync(resolve(fixturesDir, 'sc2164.sh'), 'utf-8');
-    const results = await getShellcheck().lint(script);
+    const script = readFileSync(resolve(fixturesDir, 'sc2164.sh'), 'utf-8')
+    const results = await getShellcheck().lint(script)
 
-    expect(results.length).toBeGreaterThan(0);
-    const sc2164 = results.find((r) => r.code === 2164);
-    expect(sc2164).toBeDefined();
-    expect(sc2164?.severity).toBe('warning');
-  });
+    expect(results.length).toBeGreaterThan(0)
+    const sc2164 = results.find((r) => r.code === 2164)
+    expect(sc2164).toBeDefined()
+    expect(sc2164?.severity).toBe('warning')
+  })
 
   it('should filter by severity option', async () => {
-    const script = readFileSync(resolve(fixturesDir, 'sc2086.sh'), 'utf-8');
+    const script = readFileSync(resolve(fixturesDir, 'sc2086.sh'), 'utf-8')
 
-    const results = await getShellcheck().lint(script, { severity: 'error' });
-    expect(results).toEqual([]);
+    const results = await getShellcheck().lint(script, { severity: 'error' })
+    expect(results).toEqual([])
 
-    const results2 = await getShellcheck().lint(script, { severity: 'info' });
-    expect(results2.length).toBeGreaterThan(0);
-  });
+    const results2 = await getShellcheck().lint(script, { severity: 'info' })
+    expect(results2.length).toBeGreaterThan(0)
+  })
 
   it('should exclude specific warning codes', async () => {
-    const script = readFileSync(resolve(fixturesDir, 'sc2086.sh'), 'utf-8');
+    const script = readFileSync(resolve(fixturesDir, 'sc2086.sh'), 'utf-8')
 
-    const results = await getShellcheck().lint(script, { exclude: [2086] });
-    const sc2086 = results.find((r) => r.code === 2086);
-    expect(sc2086).toBeUndefined();
-  });
+    const results = await getShellcheck().lint(script, { exclude: [2086] })
+    const sc2086 = results.find((r) => r.code === 2086)
+    expect(sc2086).toBeUndefined()
+  })
 
   it('should include only specific warning codes', async () => {
-    const script = readFileSync(resolve(fixturesDir, 'sc2086.sh'), 'utf-8');
+    const script = readFileSync(resolve(fixturesDir, 'sc2086.sh'), 'utf-8')
 
-    const results = await getShellcheck().lint(script, { include: [2086] });
-    const sc2086 = results.find((r) => r.code === 2086);
-    expect(sc2086).toBeDefined();
+    const results = await getShellcheck().lint(script, { include: [2086] })
+    const sc2086 = results.find((r) => r.code === 2086)
+    expect(sc2086).toBeDefined()
 
-    const results2 = await getShellcheck().lint(script, { include: [2164] });
-    const sc2086_2 = results2.find((r) => r.code === 2086);
-    expect(sc2086_2).toBeUndefined();
-  });
+    const results2 = await getShellcheck().lint(script, { include: [2164] })
+    const sc2086_2 = results2.find((r) => r.code === 2086)
+    expect(sc2086_2).toBeUndefined()
+  })
 
   it('should respect shell option', async () => {
-    const script = 'local var=value';
+    const script = 'local var=value'
 
-    const bashResults = await getShellcheck().lint(script, { shell: 'bash' });
-    const sc3043_bash = bashResults.find((r) => r.code === 3043);
-    expect(sc3043_bash).toBeUndefined();
+    const bashResults = await getShellcheck().lint(script, { shell: 'bash' })
+    const sc3043_bash = bashResults.find((r) => r.code === 3043)
+    expect(sc3043_bash).toBeUndefined()
 
-    const shResults = await getShellcheck().lint(script, { shell: 'sh' });
-    const sc3043_sh = shResults.find((r) => r.code === 3043);
-    expect(sc3043_sh).toBeDefined();
-  });
+    const shResults = await getShellcheck().lint(script, { shell: 'sh' })
+    const sc3043_sh = shResults.find((r) => r.code === 3043)
+    expect(sc3043_sh).toBeDefined()
+  })
 
   it('should handle virtual files for sourced scripts', async () => {
-    const mainScript = 'source ./lib.sh\necho "$MY_VAR"';
+    const mainScript = 'source ./lib.sh\necho "$MY_VAR"'
 
     const results = await getShellcheck().lint(mainScript, {
       files: {
         'lib.sh': 'MY_VAR="hello"',
       },
-    });
+    })
 
-    const sc2154 = results.find((r) => r.code === 2154);
-    expect(sc2154).toBeUndefined();
-  });
+    const sc2154 = results.find((r) => r.code === 2154)
+    expect(sc2154).toBeUndefined()
+  })
 
   it('should return fix information when available', async () => {
-    const script = 'echo $VAR';
-    const results = await getShellcheck().lint(script);
+    const script = 'echo $VAR'
+    const results = await getShellcheck().lint(script)
 
-    const sc2086 = results.find((r) => r.code === 2086);
-    expect(sc2086).toBeDefined();
+    const sc2086 = results.find((r) => r.code === 2086)
+    expect(sc2086).toBeDefined()
     if (sc2086?.fix) {
-      expect(sc2086.fix.replacements).toBeInstanceOf(Array);
+      expect(sc2086.fix.replacements).toBeInstanceOf(Array)
     }
-  });
-});
+  })
+})

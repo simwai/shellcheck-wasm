@@ -1,92 +1,92 @@
-import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest';
-import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js';
+import { afterAll, beforeAll, describe, expect, inject, it, vi } from 'vitest'
+import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js'
 
-const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined';
+const isBrowser = typeof window !== 'undefined' && typeof document !== 'undefined'
 
-const describeIf = isBrowser ? describe : describe.skip;
+const describeIf = isBrowser ? describe : describe.skip
 
 describeIf('Browser Integration Tests', () => {
-  let shellcheck: ShellCheckWasmInstance | null = null;
+  let shellcheck: ShellCheckWasmInstance | null = null
 
   beforeAll(async () => {
     if (!isBrowser) {
-      console.warn('Not in browser environment, skipping browser tests');
-      return;
+      console.warn('Not in browser environment, skipping browser tests')
+      return
     }
 
-    const injectedUrl: unknown = inject('wasmUrl');
+    const injectedUrl: unknown = inject('wasmUrl')
     if (typeof injectedUrl !== 'string' || injectedUrl.length === 0) {
-      throw new Error('wasmUrl not provided');
+      throw new Error('wasmUrl not provided')
     }
-    const { createShellCheck } = await import('../runtime/browser.js');
-    shellcheck = await createShellCheck({ wasmUrl: injectedUrl });
-  }, 120000);
+    const { createShellCheck } = await import('../runtime/browser.js')
+    shellcheck = await createShellCheck({ wasmUrl: injectedUrl })
+  }, 120000)
 
   const getShellcheck = () => {
-    if (!shellcheck) throw new Error('shellcheck not initialized');
-    return shellcheck;
-  };
+    if (!shellcheck) throw new Error('shellcheck not initialized')
+    return shellcheck
+  }
 
   afterAll(() => {
     if (shellcheck) {
-      shellcheck.terminate();
+      shellcheck.terminate()
     }
-  });
+  })
 
   it('should lint a valid script with no warnings', async () => {
     const script = `#!/bin/bash
-echo "Hello, World!"`;
-    const results = await getShellcheck().lint(script);
+echo "Hello, World!"`
+    const results = await getShellcheck().lint(script)
 
-    expect(results).toEqual([]);
-  });
+    expect(results).toEqual([])
+  })
 
   it('should detect SC2086 (unquoted variable)', async () => {
     const script = `#!/bin/bash
-echo $VAR`;
-    const results = await getShellcheck().lint(script);
+echo $VAR`
+    const results = await getShellcheck().lint(script)
 
-    expect(results.length).toBeGreaterThan(0);
-    const sc2086 = results.find((r) => r.code === 2086);
-    expect(sc2086).toBeDefined();
-    expect(sc2086?.severity).toBe('info');
-  });
+    expect(results.length).toBeGreaterThan(0)
+    const sc2086 = results.find((r) => r.code === 2086)
+    expect(sc2086).toBeDefined()
+    expect(sc2086?.severity).toBe('info')
+  })
 
   it('should filter by severity option', async () => {
     const script = `#!/bin/bash
-echo $VAR`;
+echo $VAR`
 
-    const results = await getShellcheck().lint(script, { severity: 'error' });
-    expect(results).toEqual([]);
+    const results = await getShellcheck().lint(script, { severity: 'error' })
+    expect(results).toEqual([])
 
-    const results2 = await getShellcheck().lint(script, { severity: 'info' });
-    expect(results2.length).toBeGreaterThan(0);
-  });
+    const results2 = await getShellcheck().lint(script, { severity: 'info' })
+    expect(results2.length).toBeGreaterThan(0)
+  })
 
   it('should work with virtual files for sourced scripts', async () => {
     const mainScript = `#!/bin/bash
 source ./lib.sh
-echo "$MY_VAR"`;
+echo "$MY_VAR"`
 
     const results = await getShellcheck().lint(mainScript, {
       files: {
         'lib.sh': 'MY_VAR="hello"',
       },
-    });
+    })
 
-    const sc2154 = results.find((r) => r.code === 2154);
-    expect(sc2154).toBeUndefined();
-  });
-});
+    const sc2154 = results.find((r) => r.code === 2154)
+    expect(sc2154).toBeUndefined()
+  })
+})
 
 describe('Browser API Shape (Mock)', () => {
   it('should have correct createShellCheck signature', async () => {
     type Expected = (
       options?: string | { wasmUrl?: string; forceNew?: boolean }
-    ) => Promise<import('../types.js').ShellCheckWasmInstance>;
+    ) => Promise<import('../types.js').ShellCheckWasmInstance>
 
-    const { createShellCheck } = await import('../runtime/browser.js');
-    const _check: Expected = createShellCheck;
-    expect(_check).toBeDefined();
-  });
-});
+    const { createShellCheck } = await import('../runtime/browser.js')
+    const _check: Expected = createShellCheck
+    expect(_check).toBeDefined()
+  })
+})

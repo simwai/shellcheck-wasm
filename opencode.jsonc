@@ -1,7 +1,7 @@
 {
-// opencode-native config for the Baba prompt system.
-// Inert for other agents (Claude Code, Cursor, Codex) — AGENTS.md + prompt-system/
-// remain the portable copy-paste unit. This file only affects opencode.
+  // opencode-native config for the Baba prompt system.
+  // Inert for other agents (Claude Code, Cursor, Codex) — AGENTS.md + prompt-system/
+  // remain the portable copy-paste unit. This file only affects opencode.
   "$schema": "https://opencode.ai/config.json",
 
   // Guarantees the system core is in every opencode session without relying

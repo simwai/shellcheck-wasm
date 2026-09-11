@@ -8,8 +8,7 @@
     "rules": {
       "recommended": true,
       "suspicious": {
-        "noExplicitAny": "warn",
-        "noConsole": "off"
+        "noExplicitAny": "warn"
       },
       "style": {
         "useConst": "error",
@@ -29,7 +28,7 @@
   },
   "javascript": {
     "formatter": {
-      "semicolons": "always",
+      "semicolons": "asNeeded",
       "trailingCommas": "es5",
       "quoteStyle": "single",
       "jsxQuoteStyle": "single"

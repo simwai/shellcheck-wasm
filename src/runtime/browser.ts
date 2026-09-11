@@ -1,11 +1,11 @@
-import { ConsoleStdout, File, OpenFile, WASI } from '@bjorn3/browser_wasi_shim';
-import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js';
-import type { ReactorExports } from './utils.js';
-import { assertReactorExports, isJsFfiGlueModule, parseLintResponse } from './utils.js';
+import { ConsoleStdout, File, OpenFile, WASI } from '@bjorn3/browser_wasi_shim'
+import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js'
+import type { ReactorExports } from './utils.js'
+import { assertReactorExports, isJsFfiGlueModule, parseLintResponse } from './utils.js'
 
 export class BrowserShellCheck implements ShellCheckWasmInstance {
-  private exports: ReactorExports | null = null;
-  private initialized = false;
+  private exports: ReactorExports | null = null
+  private initialized = false
 
   constructor(
     private wasmUrl: string,
@@ -13,109 +13,109 @@ export class BrowserShellCheck implements ShellCheckWasmInstance {
   ) {}
 
   async initialize(): Promise<void> {
-    if (this.initialized) return;
+    if (this.initialized) return
 
     const fds = [
       new OpenFile(new File([])),
       ConsoleStdout.lineBuffered((msg) => console.log(`[shellcheck stdout] ${msg}`)),
       ConsoleStdout.lineBuffered((msg) => console.warn(`[shellcheck stderr] ${msg}`)),
-    ];
-    const wasi = new WASI([], [], fds);
+    ]
+    const wasi = new WASI([], [], fds)
 
-    const jsModule: unknown = await import(/* @vite-ignore */ this.jsUrl);
-    if (!isJsFfiGlueModule(jsModule)) throw new Error('Invalid shellcheck JSFFI glue module');
-    const jsffiWasmImports: Record<string, WebAssembly.ImportValue> = {};
-    const jsffi = jsModule.default(jsffiWasmImports);
+    const jsModule: unknown = await import(/* @vite-ignore */ this.jsUrl)
+    if (!isJsFfiGlueModule(jsModule)) throw new Error('Invalid shellcheck JSFFI glue module')
+    const jsffiWasmImports: Record<string, WebAssembly.ImportValue> = {}
+    const jsffi = jsModule.default(jsffiWasmImports)
 
-    const response = await fetch(this.wasmUrl);
+    const response = await fetch(this.wasmUrl)
     if (!response.ok) {
-      throw new Error(`Failed to fetch WASM: ${response.status} ${response.statusText}`);
+      throw new Error(`Failed to fetch WASM: ${response.status} ${response.statusText}`)
     }
-    const wasmBytes = await response.arrayBuffer();
+    const wasmBytes = await response.arrayBuffer()
 
     const imports: WebAssembly.Imports = {
       ghc_wasm_jsffi: jsffi,
       wasi_snapshot_preview1: wasi.wasiImport,
-    };
-    const { instance } = await WebAssembly.instantiate(wasmBytes, imports);
+    }
+    const { instance } = await WebAssembly.instantiate(wasmBytes, imports)
 
-    Object.assign(jsffiWasmImports, instance.exports);
+    Object.assign(jsffiWasmImports, instance.exports)
 
-    const memory = instance.exports.memory;
+    const memory = instance.exports.memory
     if (!(memory instanceof WebAssembly.Memory))
-      throw new Error('Invalid WASM exports: missing memory');
-    wasi.initialize({ exports: { memory } });
-    assertReactorExports(instance.exports);
-    const exports = instance.exports;
-    exports.hs_init(0, 0);
+      throw new Error('Invalid WASM exports: missing memory')
+    wasi.initialize({ exports: { memory } })
+    assertReactorExports(instance.exports)
+    const exports = instance.exports
+    exports.hs_init(0, 0)
 
-    this.exports = exports;
-    this.initialized = true;
+    this.exports = exports
+    this.initialized = true
   }
 
   private requireExports(): ReactorExports {
-    if (!this.initialized || !this.exports) throw new Error('Not initialized');
-    return this.exports;
+    if (!this.initialized || !this.exports) throw new Error('Not initialized')
+    return this.exports
   }
 
   async lint(script: string, options?: LintOptions): Promise<LintResult[]> {
-    if (!this.initialized) await this.initialize();
-    const exports = this.requireExports();
-    const json = await exports.lintWithOptions(script, JSON.stringify(options ?? {}));
-    return parseLintResponse(json);
+    if (!this.initialized) await this.initialize()
+    const exports = this.requireExports()
+    const json = await exports.lintWithOptions(script, JSON.stringify(options ?? {}))
+    return parseLintResponse(json)
   }
 
   async lintWithOptions(script: string, options: LintOptions): Promise<LintResult[]> {
-    return this.lint(script, options);
+    return this.lint(script, options)
   }
 
   terminate(): void {
-    this.exports = null;
-    this.initialized = false;
+    this.exports = null
+    this.initialized = false
   }
 
   async getVersion(): Promise<string> {
-    if (!this.initialized) await this.initialize();
-    const exports = this.requireExports();
-    return exports.getVersion();
+    if (!this.initialized) await this.initialize()
+    const exports = this.requireExports()
+    return exports.getVersion()
   }
 }
 
-let cachedInstance: BrowserShellCheck | null = null;
-let cachedVersion: string | null = null;
+let cachedInstance: BrowserShellCheck | null = null
+let cachedVersion: string | null = null
 
 export async function createShellCheck(
   options?: string | { wasmUrl?: string; forceNew?: boolean }
 ): Promise<ShellCheckWasmInstance> {
-  const normalized = typeof options === 'string' ? { wasmUrl: options } : options;
-  const finalWasm = normalized?.wasmUrl ?? '/shellcheck.wasm';
-  const finalJs = finalWasm.replace(/\.wasm($|\?)/, '.js$1');
+  const normalized = typeof options === 'string' ? { wasmUrl: options } : options
+  const finalWasm = normalized?.wasmUrl ?? '/shellcheck.wasm'
+  const finalJs = finalWasm.replace(/\.wasm($|\?)/, '.js$1')
 
   // Check if we need to create a new instance
   if (!normalized?.forceNew && cachedInstance && cachedVersion) {
-    const instance = new BrowserShellCheck(finalWasm, finalJs);
-    await instance.initialize();
-    const version = await instance.getVersion();
+    const instance = new BrowserShellCheck(finalWasm, finalJs)
+    await instance.initialize()
+    const version = await instance.getVersion()
     if (version === cachedVersion) {
-      instance.terminate();
-      return cachedInstance;
+      instance.terminate()
+      return cachedInstance
     }
     // Version mismatch, terminate old instance
-    cachedInstance.terminate();
+    cachedInstance.terminate()
   }
 
-  const instance = new BrowserShellCheck(finalWasm, finalJs);
-  await instance.initialize();
-  cachedVersion = await instance.getVersion();
-  cachedInstance = instance;
-  return instance;
+  const instance = new BrowserShellCheck(finalWasm, finalJs)
+  await instance.initialize()
+  cachedVersion = await instance.getVersion()
+  cachedInstance = instance
+  return instance
 }
 
 export function resetCache(): void {
   if (!cachedInstance) {
-    return;
+    return
   }
-  cachedInstance.terminate();
-  cachedInstance = null;
-  cachedVersion = null;
+  cachedInstance.terminate()
+  cachedInstance = null
+  cachedVersion = null
 }

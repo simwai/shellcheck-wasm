@@ -9,7 +9,7 @@ export {
   lint,
   lintWithOptions,
   resetShellCheck,
-} from './api.js';
+} from './api.js'
 
 export type {
   LintOptions,
@@ -17,4 +17,4 @@ export type {
   Replacement,
   FixInfo,
   ShellCheckWasmInstance,
-} from './types.js';
+} from './types.js'

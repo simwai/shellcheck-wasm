@@ -1,90 +1,87 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { type Server, createServer } from 'node:http';
-import { resolve } from 'node:path';
-import { fileURLToPath, pathToFileURL } from 'node:url';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { BrowserShellCheck } from '../runtime/browser.js';
-import type { ShellCheckWasmInstance } from '../types.js';
+import { existsSync, readFileSync } from 'node:fs'
+import { type Server, createServer } from 'node:http'
+import { resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { BrowserShellCheck } from '../runtime/browser.js'
+import type { ShellCheckWasmInstance } from '../types.js'
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = resolve(__filename, '..');
-const projectRoot = resolve(__dirname, '../..');
-const distDir = resolve(projectRoot, 'dist');
-const wasmPath = resolve(distDir, 'shellcheck.wasm');
-const jsPath = resolve(distDir, 'shellcheck.js');
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = resolve(__filename, '..')
+const projectRoot = resolve(__dirname, '../..')
+const distDir = resolve(projectRoot, 'dist')
+const wasmPath = resolve(distDir, 'shellcheck.wasm')
+const jsPath = resolve(distDir, 'shellcheck.js')
 
-const distBuilt = existsSync(wasmPath) && existsSync(jsPath);
+const distBuilt = existsSync(wasmPath) && existsSync(jsPath)
 
-const describeIf = distBuilt ? describe : describe.skip;
+const describeIf = distBuilt ? describe : describe.skip
 
 describeIf('Browser runtime over HTTP', () => {
-  let server: Server | null = null;
-  let baseUrl = '';
-  let shellcheck: ShellCheckWasmInstance | null = null;
+  let server: Server | null = null
+  let baseUrl = ''
+  let shellcheck: ShellCheckWasmInstance | null = null
 
   beforeAll(async () => {
-    const wasmBytes = readFileSync(wasmPath);
-    const jsBytes = readFileSync(jsPath);
+    const wasmBytes = readFileSync(wasmPath)
+    const jsBytes = readFileSync(jsPath)
 
     server = createServer((req, res) => {
       if (req.url === '/shellcheck.wasm') {
-        res.writeHead(200, { 'content-type': 'application/wasm' });
-        res.end(wasmBytes);
+        res.writeHead(200, { 'content-type': 'application/wasm' })
+        res.end(wasmBytes)
       } else if (req.url === '/shellcheck.js') {
-        res.writeHead(200, { 'content-type': 'text/javascript' });
-        res.end(jsBytes);
+        res.writeHead(200, { 'content-type': 'text/javascript' })
+        res.end(jsBytes)
       } else {
-        res.writeHead(404);
-        res.end('not found');
+        res.writeHead(404)
+        res.end('not found')
       }
-    });
+    })
     await new Promise<void>((resolvePromise) => {
-      server?.listen(0, '127.0.0.1', () => resolvePromise());
-    });
-    const address = server?.address();
+      server?.listen(0, '127.0.0.1', () => resolvePromise())
+    })
+    const address = server?.address()
     if (typeof address !== 'object' || address === null) {
-      throw new Error('Failed to bind test HTTP server');
+      throw new Error('Failed to bind test HTTP server')
     }
-    baseUrl = `http://127.0.0.1:${address.port}`;
+    baseUrl = `http://127.0.0.1:${address.port}`
 
-    const instance = new BrowserShellCheck(
-      `${baseUrl}/shellcheck.wasm`,
-      pathToFileURL(jsPath).href
-    );
-    await instance.initialize();
-    shellcheck = instance;
-  }, 60000);
+    const instance = new BrowserShellCheck(`${baseUrl}/shellcheck.wasm`, pathToFileURL(jsPath).href)
+    await instance.initialize()
+    shellcheck = instance
+  }, 60000)
 
   afterAll(async () => {
-    shellcheck?.terminate();
-    shellcheck = null;
+    shellcheck?.terminate()
+    shellcheck = null
     await new Promise<void>((resolvePromise) => {
-      if (server) server.close(() => resolvePromise());
-      else resolvePromise();
-    });
-    server = null;
-  });
+      if (server) server.close(() => resolvePromise())
+      else resolvePromise()
+    })
+    server = null
+  })
 
   const getShellcheck = (): ShellCheckWasmInstance => {
-    if (!shellcheck) throw new Error('shellcheck not initialized');
-    return shellcheck;
-  };
+    if (!shellcheck) throw new Error('shellcheck not initialized')
+    return shellcheck
+  }
 
   it('serves the wasm with the correct MIME type', async () => {
-    const res = await fetch(`${baseUrl}/shellcheck.wasm`);
-    expect(res.ok).toBe(true);
-    expect(res.headers.get('content-type')).toBe('application/wasm');
-  });
+    const res = await fetch(`${baseUrl}/shellcheck.wasm`)
+    expect(res.ok).toBe(true)
+    expect(res.headers.get('content-type')).toBe('application/wasm')
+  })
 
   it('lints through the browser runtime', async () => {
-    const results = await getShellcheck().lint('echo $VAR');
-    const sc2086 = results.find((r) => r.code === 2086);
-    expect(sc2086).toBeDefined();
-    expect(sc2086?.message).toContain('Double quote');
-  });
+    const results = await getShellcheck().lint('echo $VAR')
+    const sc2086 = results.find((r) => r.code === 2086)
+    expect(sc2086).toBeDefined()
+    expect(sc2086?.message).toContain('Double quote')
+  })
 
   it('returns no warnings for a clean script', async () => {
-    const results = await getShellcheck().lint('#!/bin/bash\necho "hello"');
-    expect(results).toEqual([]);
-  });
-});
+    const results = await getShellcheck().lint('#!/bin/bash\necho "hello"')
+    expect(results).toEqual([])
+  })
+})
