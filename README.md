@@ -20,9 +20,9 @@ npm install shellcheck-wasm
 One-step release:
 
 ```bash
-npm run release -- patch   # 0.1.0 -> 0.1.1
-npm run release -- minor   # 0.1.0 -> 0.2.0
-npm run release -- major   # 0.1.0 -> 1.0.0
+npm run release-patch   # 0.1.0 -> 0.1.1
+npm run release-minor   # 0.1.0 -> 0.2.0
+npm run release-major   # 0.1.0 -> 1.0.0
 ```
 
 This runs tests, bumps the version, rebuilds `dist/`, commits, pushes the tag, and publishes to npm.
