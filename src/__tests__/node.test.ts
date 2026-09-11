@@ -25,7 +25,7 @@ describeIf('Node.js Integration Tests', () => {
     }
 
     const { createShellCheck } = await import('../runtime/node.js');
-    shellcheck = await createShellCheck(wasmPath);
+    shellcheck = await createShellCheck({ wasmPath });
   }, 60000);
 
   const getShellcheck = () => {

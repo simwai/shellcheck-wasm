@@ -99,16 +99,16 @@ export class NodeShellCheck implements ShellCheckWasmInstance {
 let cachedInstance: NodeShellCheck | null = null;
 let cachedVersion: string | null = null;
 
-export async function createShellCheck(options?: {
-  wasmPath?: string;
-  forceNew?: boolean;
-}): Promise<ShellCheckWasmInstance> {
+export async function createShellCheck(
+  options?: string | { wasmPath?: string; forceNew?: boolean }
+): Promise<ShellCheckWasmInstance> {
+  const normalized = typeof options === 'string' ? { wasmPath: options } : options;
   const defaultWasm = path.resolve(__dirname, '../../dist/shellcheck.wasm');
-  const finalWasm = options?.wasmPath ?? defaultWasm;
+  const finalWasm = normalized?.wasmPath ?? defaultWasm;
   const finalJs = path.resolve(path.dirname(finalWasm), 'shellcheck.js');
 
   // Check if we need to create a new instance
-  if (!options?.forceNew && cachedInstance && cachedVersion) {
+  if (!normalized?.forceNew && cachedInstance && cachedVersion) {
     const instance = new NodeShellCheck(finalWasm, finalJs);
     await instance.initialize();
     const version = await instance.getVersion();

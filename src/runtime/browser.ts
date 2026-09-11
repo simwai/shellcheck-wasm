@@ -91,15 +91,15 @@ export class BrowserShellCheck implements ShellCheckWasmInstance {
 let cachedInstance: BrowserShellCheck | null = null;
 let cachedVersion: string | null = null;
 
-export async function createShellCheck(options?: {
-  wasmUrl?: string;
-  forceNew?: boolean;
-}): Promise<ShellCheckWasmInstance> {
-  const finalWasm = options?.wasmUrl ?? '/shellcheck.wasm';
+export async function createShellCheck(
+  options?: string | { wasmUrl?: string; forceNew?: boolean }
+): Promise<ShellCheckWasmInstance> {
+  const normalized = typeof options === 'string' ? { wasmUrl: options } : options;
+  const finalWasm = normalized?.wasmUrl ?? '/shellcheck.wasm';
   const finalJs = finalWasm.replace(/\.wasm($|\?)/, '.js$1');
 
   // Check if we need to create a new instance
-  if (!options?.forceNew && cachedInstance && cachedVersion) {
+  if (!normalized?.forceNew && cachedInstance && cachedVersion) {
     const instance = new BrowserShellCheck(finalWasm, finalJs);
     await instance.initialize();
     const version = await instance.getVersion();
@@ -119,9 +119,10 @@ export async function createShellCheck(options?: {
 }
 
 export function resetCache(): void {
-  if (cachedInstance) {
-    cachedInstance.terminate();
-    cachedInstance = null;
-    cachedVersion = null;
+  if (!cachedInstance) {
+    return;
   }
+  cachedInstance.terminate();
+  cachedInstance = null;
+  cachedVersion = null;
 }

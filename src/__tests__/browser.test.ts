@@ -16,7 +16,7 @@ describeIf('Browser Integration Tests', () => {
 
     const wasmUrl = inject('wasmUrl') as string;
     const { createShellCheck } = await import('../runtime/browser.js');
-    shellcheck = await createShellCheck(wasmUrl);
+    shellcheck = await createShellCheck({ wasmUrl });
   }, 120000);
 
   const getShellcheck = () => {
@@ -79,7 +79,9 @@ echo "$MY_VAR"`;
 describe('Browser API Shape (Mock)', () => {
   it('should have correct createShellCheck signature', () => {
     type CreateShellCheck = typeof import('../runtime/browser.js').createShellCheck;
-    type Expected = (wasmUrl?: string) => Promise<import('../types.js').ShellCheckWasmInstance>;
+    type Expected = (
+      options?: string | { wasmUrl?: string; forceNew?: boolean }
+    ) => Promise<import('../types.js').ShellCheckWasmInstance>;
 
     const _check: CreateShellCheck = {} as Expected;
     expect(true).toBe(true);
