@@ -1,14 +1,7 @@
 import { ConsoleStdout, File, OpenFile, WASI } from '@bjorn3/browser_wasi_shim';
 import type { LintOptions, LintResult, ShellCheckWasmInstance } from '../types.js';
-import { parseLintResponse } from './utils.js';
-
-interface ReactorExports extends WebAssembly.Exports {
-  memory: WebAssembly.Memory;
-  _initialize(): void;
-  hs_init(argc: number, argv: number): void;
-  lintWithOptions(script: string, optionsJson: string): Promise<string>;
-  getVersion(): Promise<string>;
-}
+import type { ReactorExports } from './utils.js';
+import { assertReactorExports, isJsFfiGlueModule, parseLintResponse } from './utils.js';
 
 export class BrowserShellCheck implements ShellCheckWasmInstance {
   private exports: ReactorExports | null = null;
@@ -29,10 +22,9 @@ export class BrowserShellCheck implements ShellCheckWasmInstance {
     ];
     const wasi = new WASI([], [], fds);
 
-    const jsModule = (await import(/* @vite-ignore */ this.jsUrl)) as {
-      default: (exports: unknown) => Record<string, WebAssembly.ImportValue>;
-    };
-    const jsffiWasmImports: Record<string, unknown> = {};
+    const jsModule: unknown = await import(/* @vite-ignore */ this.jsUrl);
+    if (!isJsFfiGlueModule(jsModule)) throw new Error('Invalid shellcheck JSFFI glue module');
+    const jsffiWasmImports: Record<string, WebAssembly.ImportValue> = {};
     const jsffi = jsModule.default(jsffiWasmImports);
 
     const response = await fetch(this.wasmUrl);
@@ -41,19 +33,20 @@ export class BrowserShellCheck implements ShellCheckWasmInstance {
     }
     const wasmBytes = await response.arrayBuffer();
 
-    const { instance } = await WebAssembly.instantiate(wasmBytes, {
+    const imports: WebAssembly.Imports = {
       ghc_wasm_jsffi: jsffi,
       wasi_snapshot_preview1: wasi.wasiImport,
-    } as WebAssembly.Imports);
+    };
+    const { instance } = await WebAssembly.instantiate(wasmBytes, imports);
 
     Object.assign(jsffiWasmImports, instance.exports);
 
-    wasi.initialize(
-      instance as unknown as {
-        exports: { memory: WebAssembly.Memory; _initialize?: () => unknown };
-      }
-    );
-    const exports = instance.exports as unknown as ReactorExports;
+    const memory = instance.exports.memory;
+    if (!(memory instanceof WebAssembly.Memory))
+      throw new Error('Invalid WASM exports: missing memory');
+    wasi.initialize({ exports: { memory } });
+    assertReactorExports(instance.exports);
+    const exports = instance.exports;
     exports.hs_init(0, 0);
 
     this.exports = exports;
