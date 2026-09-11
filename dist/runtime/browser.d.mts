@@ -13,7 +13,7 @@ declare class BrowserShellCheck implements ShellCheckWasmInstance {
     terminate(): void;
     getVersion(): Promise<string>;
 }
-declare function createShellCheck(options?: {
+declare function createShellCheck(options?: string | {
     wasmUrl?: string;
     forceNew?: boolean;
 }): Promise<ShellCheckWasmInstance>;

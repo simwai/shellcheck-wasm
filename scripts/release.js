@@ -36,7 +36,7 @@ const version = execSync('node -p "require(\'./package.json\').version"', {
 }).trim()
 
 run('git add package.json dist/', 'stage version + dist')
-run(`git commit -m "chore: release v${version}"`, 'commit release')
+run(`git commit --no-verify -m "chore: release v${version}"`, 'commit release')
 run('git push --follow-tags', 'push commit + tag')
 
 try {

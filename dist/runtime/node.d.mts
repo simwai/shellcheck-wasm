@@ -13,7 +13,7 @@ declare class NodeShellCheck implements ShellCheckWasmInstance {
     terminate(): void;
     getVersion(): Promise<string>;
 }
-declare function createShellCheck(options?: {
+declare function createShellCheck(options?: string | {
     wasmPath?: string;
     forceNew?: boolean;
 }): Promise<ShellCheckWasmInstance>;

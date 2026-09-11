@@ -2,7 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { OpenFile, File, ConsoleStdout, WASI } from '@bjorn3/browser_wasi_shim';
-import { p as parseLintResponse } from '../shared/shellcheck-wasm.D-14Pj2f.mjs';
+import { i as isJsFfiGlueModule, a as assertReactorExports, p as parseLintResponse } from '../shared/shellcheck-wasm.DIDZ6e2P.mjs';
 
 const __filename$1 = fileURLToPath(import.meta.url);
 const __dirname$1 = path.dirname(__filename$1);
@@ -28,16 +28,20 @@ class NodeShellCheck {
     ];
     const wasi = new WASI([], [], fds);
     const jsModule = await import(pathToFileURL(this.jsPath).href);
+    if (!isJsFfiGlueModule(jsModule)) throw new Error("Invalid shellcheck JSFFI glue module");
     const jsffiWasmImports = {};
     const jsffi = jsModule.default(jsffiWasmImports);
-    const { instance } = await WebAssembly.instantiate(wasmBytes, {
+    const imports = {
       ghc_wasm_jsffi: jsffi,
       wasi_snapshot_preview1: wasi.wasiImport
-    });
+    };
+    const { instance } = await WebAssembly.instantiate(wasmBytes, imports);
     Object.assign(jsffiWasmImports, instance.exports);
-    wasi.initialize(
-      instance
-    );
+    const memory = instance.exports.memory;
+    if (!(memory instanceof WebAssembly.Memory))
+      throw new Error("Invalid WASM exports: missing memory");
+    wasi.initialize({ exports: { memory } });
+    assertReactorExports(instance.exports);
     const exports = instance.exports;
     exports.hs_init(0, 0);
     this.exports = exports;
@@ -69,10 +73,11 @@ class NodeShellCheck {
 let cachedInstance = null;
 let cachedVersion = null;
 async function createShellCheck(options) {
+  const normalized = typeof options === "string" ? { wasmPath: options } : options;
   const defaultWasm = path.resolve(__dirname$1, "../../dist/shellcheck.wasm");
-  const finalWasm = options?.wasmPath ?? defaultWasm;
+  const finalWasm = normalized?.wasmPath ?? defaultWasm;
   const finalJs = path.resolve(path.dirname(finalWasm), "shellcheck.js");
-  if (!options?.forceNew && cachedInstance && cachedVersion) {
+  if (!normalized?.forceNew && cachedInstance && cachedVersion) {
     const instance2 = new NodeShellCheck(finalWasm, finalJs);
     await instance2.initialize();
     const version = await instance2.getVersion();
