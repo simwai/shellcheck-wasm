@@ -17,17 +17,22 @@ npm install shellcheck-wasm
 
 ## Publishing
 
-This package is ready to publish to npm. Before publishing:
+One-step release:
 
-1. Ensure the WASM build is current:
-   ```bash
-   npm run build
-   ```
-2. Commit the updated `dist/` artifacts.
-3. Publish:
-   ```bash
-   npm publish
-   ```
+```bash
+npm run release -- patch   # 0.1.0 -> 0.1.1
+npm run release -- minor   # 0.1.0 -> 0.2.0
+npm run release -- major   # 0.1.0 -> 1.0.0
+```
+
+This runs tests, bumps the version, rebuilds `dist/`, commits, pushes the tag, and publishes to npm.
+
+For manual control:
+
+```bash
+npm run build
+npm publish
+```
 
 ## Usage
 
