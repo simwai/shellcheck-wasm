@@ -1,7 +1,7 @@
 {
-  // opencode-native config for the Baba prompt system.
-  // Inert for other agents (Claude Code, Cursor, Codex) — AGENTS.md + prompt-system/
-  // remain the portable copy-paste unit. This file only affects opencode.
+// opencode-native config for the Baba prompt system.
+// Inert for other agents (Claude Code, Cursor, Codex) — AGENTS.md + prompt-system/
+// remain the portable copy-paste unit. This file only affects opencode.
   "$schema": "https://opencode.ai/config.json",
 
   // Guarantees the system core is in every opencode session without relying
@@ -19,7 +19,8 @@
     "prompt-system/04-rubrics.md",
     "prompt-system/05-impl-style.md",
     "prompt-system/06-misc.md",
-    "prompt-system/07-protocols.md"
+    "prompt-system/07-protocols.md",
+    "prompt-system/08-plan-actual-gate.md"
   ],
 
   // Prefer the read-only BabaSensei planning path by default. The native Build
@@ -198,9 +199,9 @@
   },
 
   // Truncate oversized tool output early so one oversized read does not burn
-  // the whole turn budget.
+  // the whole turn budget. Increased to 5000 to accommodate full system file reads.
   "tool_output": {
-    "max_lines": 1000,
+    "max_lines": 5000,
     "max_bytes": 32768
   },
 
@@ -212,7 +213,8 @@
     "opencode-vibeguard@latest",
     "opencode-adaptive-thinking@latest",
     "opencode-pty",
-    "opencode-scheduler"
+    "opencode-scheduler",
+    ".opencode/plugins/startup-gate.ts"
   ],
 
   // MCP servers mirror the fallback tiers in AGENTS.md, adapted to opencode's

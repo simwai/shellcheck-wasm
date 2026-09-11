@@ -453,6 +453,8 @@ In `DIRECT` mode, do not force the request through `CHECKLIST`, `REVIEW`, or `PL
 
 ### Transition rules (key paths)
 
+**Global prerequisite**: All phase transitions require `startup_verified: true` in the session state file with a valid `startup_fingerprint`. If missing, output `BLOCKED` with reason "STARTUP incomplete".
+
 - `START -> STARTUP`: (MANDATORY) read 00-system.md full + fingerprint + load all 7 system files.
 - `STARTUP -> INTAKE`: goal or project spec without a concrete target.
 - `STARTUP -> CHECKLIST`: target known, scope known, language known or obvious.
