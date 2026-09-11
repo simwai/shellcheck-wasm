@@ -29,15 +29,15 @@ function runPublish() {
 }
 
 run('npm test', 'run tests')
+run('git submodule update --init --recursive', 'ensure submodule state is clean')
 run(`npm version ${type} && npm run build`, `bump ${type} version and build`)
 
 const version = execSync('node -p "require(\'./package.json\').version"', {
   encoding: 'utf8',
 }).trim()
 
-run('git add package.json dist/', 'stage version + dist')
-run('git submodule update --init --recursive', 'ensure submodule state is clean')
-run(`git commit -m "chore: release v${version}"`, 'commit release')
+run('git add dist/', 'stage rebuilt dist')
+run(`git commit --amend -m "chore: release v${version}"`, 'amend version commit to include dist')
 run('git push --follow-tags', 'push commit + tag')
 
 try {
