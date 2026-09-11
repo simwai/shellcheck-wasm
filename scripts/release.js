@@ -29,7 +29,7 @@ function runPublish() {
 }
 
 run('npm test', 'run tests')
-run(`npm run version:${type}`, `bump ${type} version and build`)
+run(`npm version ${type} && npm run build`, `bump ${type} version and build`)
 
 const version = execSync('node -p "require(\'./package.json\').version"', {
   encoding: 'utf8',
