@@ -6,7 +6,6 @@ argument-hint:
 
 @prompt-system/00-system.md
 @prompt-system/01-personas.md
-@prompt-system/02-decision-prompts.md
 @prompt-system/03-output-and-state.md
 @prompt-system/04-rubrics.md
 @prompt-system/05-impl-style.md
