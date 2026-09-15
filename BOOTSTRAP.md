@@ -26,12 +26,12 @@ Before ANY phase transition (including `START -> CHECKLIST`, `START -> INTAKE`, 
 
 3. **Load all 7 other system files** per the load order in 00-system.md, each in full with NO chunking:
    - `prompt-system/01-personas.md`
-   - `prompt-system/02-decision-prompts.md`
    - `prompt-system/03-output-and-state.md`
    - `prompt-system/04-rubrics.md`
    - `prompt-system/05-impl-style.md`
    - `prompt-system/06-misc.md`
    - `prompt-system/07-protocols.md`
+   - `prompt-system/08-plan-actual-gate.md`
 
 4. **Record completion** in the session state file's `## Startup Verification` section.
 
@@ -83,7 +83,6 @@ After emitting fingerprint, confirm:
 ## Startup Verification
 00-system.md: [cited rule] — fingerprint: <line_count> lines, first_100_chars="<first 100 chars>", last_100_chars="<last 100 chars>", sha256_first_1kb="<hash or N/A>"
 01-personas.md: [cited rule]
-02-decision-prompts.md: [cited rule]
 03-output-and-state.md: [cited rule]
 04-rubrics.md: [cited rule]
 05-impl-style.md: [cited rule]
