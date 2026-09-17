@@ -460,11 +460,16 @@ The defaults above are a floor, not a ceiling. They never replace the per-edit l
   - Heading hierarchy is sequential (`<h1>` -> `<h2>` -> `<h3>`, no skipping)
   - Structured data (JSON-LD) for pages representing entities (products, articles, events, organizations)
   - Canonical URL tag on every indexable page
- - Open Graph and Twitter Card meta tags on shareable content pages
+  - Open Graph and Twitter Card meta tags on shareable content pages
 
 ## Design Guidelines
 
-This section covers UI/UX defaults for frontend work. Greenfield projects adopt these as binding conventions; existing projects apply them through `STYLE_POLICY.md` (`preserve-local` or `upgrade-house-style`). Override per project via the `Stack/Style:` field or `STYLE_POLICY.md`. Accessibility and SEO rules are governed by the existing rubric IDs `S21`-`S24`; this section does not duplicate them.
+This section covers UI/UX defaults for frontend work. Greenfield projects adopt
+these as binding conventions; existing projects apply them through
+`STYLE_POLICY.md` (`preserve-local` or `upgrade-house-style`). Override per
+project via the `Stack/Style:` field or `STYLE_POLICY.md`. Accessibility and
+SEO rules are governed by the existing rubric IDs `S21`-`S24`; this section
+does not duplicate them.
 
 ### Palettes
 
@@ -496,9 +501,9 @@ Require `font-display: swap` on all web font loads. Forbid custom font files unl
 
 Preferred icon sets by stack:
 
-- **Web frontend**: Lucide or Phosphor
+- **Web frontend**: Lucide
 - **Vue component libraries**: Nuxt UI icons
-- **React component libraries**: Heroicons or Radix Icons
+- **React component libraries**: Radix Icons
 - **Pine Script / terminal UIs**: Unicode symbols only
 
 Require `aria-hidden="true"` on decorative icons and accessible names on meaningful icons. Forbid icon fonts.
@@ -531,12 +536,14 @@ At most one gradient per viewport or major section. Use gradients for background
 Animation is optional. When used, keep it purposeful and tied to user action or state change.
 
 Common pitfalls:
+
 - Over-animating: too many animations competing for attention
 - Animating properties that trigger layout or paint
 - Forgetting `prefers-reduced-motion`
 - Using motion to hide slow performance
 
 Tips:
+
 - Animate `transform` and `opacity` only
 - Keep durations short
 - Use easing that feels physical
@@ -548,21 +555,25 @@ Tips:
 Approved element types: subtle grids, abstract shapes, low-opacity doodles, wave dividers, grain or noise texture.
 
 Performance rules:
+
 - CSS-only preferred
 - SVG for vector shapes
 - Canvas only when necessary
 - Keep asset count low
 
 Placement rules:
+
 - Background only
 - Never over readable content
 - Respect content contrast
 
 Motion rules:
+
 - Static by default
 - Animation only if it respects `prefers-reduced-motion`
 
 Anti-patterns:
+
 - Full-page busy backgrounds
 - Animated backgrounds over text
 - Heavy particle systems
@@ -572,7 +583,11 @@ Decorative layers must never interfere with readability or a11y contrast.
 
 ### Hero sections
 
-Every top-level page must have a hero section. The hero must include one unique visual or interactive element not repeated elsewhere on the page. The hero is the only approved location for the single allowed gradient and the single allowed subtle animation. The hero must establish the page's purpose in under 3 seconds.
+Every top-level page must have a hero section. The hero must include one unique
+visual or interactive element not repeated elsewhere on the page. The hero is
+the only approved location for the single allowed gradient and the single
+allowed subtle animation. The hero must establish the page's purpose in under 3
+seconds.
 
 ### Input preservation
 
@@ -580,7 +595,12 @@ Never lose user input by default. Preserve form values, selections, and scroll p
 
 Explicit exception: search fields may clear input after submission when the UX pattern requires it for fast repeated searches. Document any exception in the component's docstring or comment.
 
-Temporary user state not yet committed to backend storage must be persisted in `localStorage`. Scope: draft form values, unsaved selections, in-progress multi-step flows, and transient UI preferences. Exclusions: never store secrets, tokens, passwords, or sensitive PII in `localStorage`. Require a clear expiration or cleanup strategy when the state is no longer relevant. Document the storage key naming convention in the component or feature README.
+Temporary user state not yet committed to backend storage must be persisted in
+`localStorage`. Scope: draft form values, unsaved selections, in-progress
+multi-step flows, and transient UI preferences. Exclusions: never store
+secrets, tokens, passwords, or sensitive PII in `localStorage`. Require a clear
+expiration or cleanup strategy when the state is no longer relevant. Document
+the storage key naming convention in the component or feature README.
 
 ### Bring your own
 
