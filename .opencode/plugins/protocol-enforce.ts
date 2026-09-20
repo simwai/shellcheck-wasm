@@ -14,7 +14,7 @@
  * metadata does not carry phase information.
  */
 
-import { getCurrentPhase } from "./phase-detect";
+import { getCurrentPhase, updatePhaseFromMessages } from "./phase-detect";
 
 interface ProtocolState {
   sessionId: string;
@@ -116,9 +116,9 @@ const PROTOCOL_CHECKS = {
     return checks;
   },
 
-  "library-selection": async ($: any, directory: string, editedFiles: string[], state: any) => {
+  "library-selection": async ($: any, directory: string, editedFiles: string[], _state: any) => {
     const checks = [];
-    if (state.currentPhase === "PLAN") {
+    if (_state.currentPhase === "PLAN") {
       const planFiles = editedFiles.filter(f => f.includes("plan") || f.includes("Plan"));
       if (planFiles.length > 0) {
         checks.push({
@@ -128,11 +128,11 @@ const PROTOCOL_CHECKS = {
         });
       }
     }
-    if (state.currentPhase === "PATCH" || state.currentPhase === "DOCS") {
+    if (_state.currentPhase === "PATCH" || _state.currentPhase === "DOCS") {
       const depFiles = ["package.json", "pyproject.toml", "Cargo.toml", "go.mod", "pom.xml"];
       for (const depFile of depFiles) {
         const path = `${directory}/${depFile}`;
-        if (editedFiles.includes(depFile) || (await $.exists(path) && editedFiles.some(f => f.startsWith(depFile.replace(".json", "").replace(".toml", ""))))) {
+        if (editedFiles.includes(depFile) || (await $.exists(path) && editedFiles.some(f => f.startsWith(depFile.replace(".json", "").replace(".toml", "")))) {
           checks.push({ protocol: "library-selection", passed: true, message: "Dependency file modified - verify library selection protocol was followed" });
         }
       }
@@ -294,6 +294,8 @@ export default async ({ client, $, project, directory, worktree }: {
 
       const state = protocolStates.get(sessionId);
       if (!state) return;
+
+      updatePhaseFromMessages(sessionId, output.messages);
 
       const newPhase = getCurrentPhase(sessionId);
       if (!newPhase || newPhase === state.currentPhase) return;

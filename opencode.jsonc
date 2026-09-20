@@ -48,7 +48,8 @@
     ".opencode/plugins/startup-gate.ts",
     ".opencode/plugins/baba-subtask.ts",
     ".opencode/plugins/baba-bootstrap.ts",
-    ".opencode/plugins/protocol-enforce.ts"
+    ".opencode/plugins/protocol-enforce.ts",
+    ".opencode/plugins/baba-goal-detect.ts"
   ],
 
   // MCP servers mirror the fallback tiers in AGENTS.md, adapted to opencode's
