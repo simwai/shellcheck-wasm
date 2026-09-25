@@ -79,7 +79,7 @@ const BABA_AGENTS = [
   "baba-dev",
   "baba-tester",
   "baba-reviewer",
-  "baba-scrummaster",
+  "baba-scrum",
 ];
 
 // ============================================================================
@@ -727,7 +727,7 @@ export default async (input: PluginInput): Promise<Hooks> => {
     tool: {
       task: tool({
         description:
-          "Delegate a task to a Baba subagent. Routes through baba-sensei, baba-dev, baba-tester, baba-reviewer, or baba-scrummaster.",
+          "Delegate a task to a Baba subagent. Routes through baba-sensei, baba-dev, baba-tester, baba-reviewer, or baba-scrum.",
         args: {
           prompt: tool.schema.string().describe("The task prompt to delegate"),
           agent: tool
